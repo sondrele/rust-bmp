@@ -1,0 +1,10 @@
+# Local files
+*.sublime-*
+
+# Generated files
+*.o
+*.bc
+*.rlib
+
+# Test files
+*_test.bmp
