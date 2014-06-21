@@ -7,7 +7,7 @@ Usage
 -----
 Initialize a new image with the `new` function, specifying `width` and `height`.
 ```
-let img = BMPimage::new(100, 100);
+let mut img = BMPimage::new(100, 100);
 ```
 Edit image data using the `get_pixel` and `set_pixel` functions.
 Save an image with the `save` function, specifying the `path`.
@@ -18,5 +18,5 @@ img.save("path/to/img.bmp");
 ```
 Open an existing image with the `open` function, specifying the `path`.
 ```
-let img = BMPimage::save("path/to/img.bmp");
+let mut img = BMPimage::open("path/to/img.bmp");
 ```
