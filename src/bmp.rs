@@ -18,60 +18,60 @@ impl BMPid {
 
 #[deriving(Show)]
 struct BMPheader {
-    fileSize: u32,
+    file_size: u32,
     creator1: u16,
     creator2: u16,
-    pixelOffset: u32
+    pixel_offset: u32
 }
 
 impl BMPheader {
     pub fn new(width: u32, height: u32) -> BMPheader {
         BMPheader {
-            fileSize: width * height * 4 /* bytes per pixel */ + 54 /* Header size */,
+            file_size: width * height * 4 /* bytes per pixel */ + 54 /* Header size */,
             creator1: 0 /* Unused */,
             creator2: 0 /* Unused */,
-            pixelOffset: 54
+            pixel_offset: 54
         }
     }
 }
 
 #[deriving(Show)]
 struct BMPDIBheader {
-    headerSize: u32,
+    header_size: u32,
     width: i32,
     height: i32,
-    numPlanes: u16,
-    bitPrPixel: u16,
-    compressType: u32,
-    dataSize: u32,
+    num_planes: u16,
+    bits_per_pixel: u16,
+    compress_type: u32,
+    data_size: u32,
     hres: i32,
     vres: i32,
-    numColors: u32,
-    numImpColors: u32,
+    num_colors: u32,
+    num_imp_colors: u32,
 }
 
 impl BMPDIBheader {
     pub fn new(width: i32, height: i32) -> BMPDIBheader {
-        let rowSize = ((24.0 * width as f32 + 31.0) / 32.0).floor() as u32 * 4;
-        let pixelArraySize = rowSize * height as u32;
+        let row_size = ((24.0 * width as f32 + 31.0) / 32.0).floor() as u32 * 4;
+        let pixel_array_size = row_size * height as u32;
 
         BMPDIBheader {
-            headerSize: 40,
+            header_size: 40,
             width: width,
             height: height,
-            numPlanes: 1,
-            bitPrPixel: 24,
-            compressType: 0,
-            dataSize: pixelArraySize,
+            num_planes: 1,
+            bits_per_pixel: 24,
+            compress_type: 0,
+            data_size: pixel_array_size,
             hres: 0x100,
             vres: 0x100,
-            numColors: 0,
-            numImpColors: 0
+            num_colors: 0,
+            num_imp_colors: 0
         }
     }
 }
 
-#[deriving(Show, Eq)]
+#[deriving(Show, PartialEq)]
 pub struct BMPpixel {
     r: u8,
     g: u8,
@@ -86,11 +86,11 @@ pub static WHITE: BMPpixel = BMPpixel{ r: 255, g: 255, b: 255 };
 pub struct BMPimage {
     magic: BMPid,
     header: BMPheader,
-    dibHeader: BMPDIBheader,
+    dib_header: BMPDIBheader,
     width: i32,
     height: i32,
     padding: i32,
-    paddingData: [u8, .. 4],
+    padding_data: [u8, .. 4],
     data: Option<Vec<BMPpixel>>
 }
 
@@ -103,17 +103,17 @@ impl BMPimage {
         BMPimage {
             magic: BMPid::new(),
             header: BMPheader::new(width as u32, height as u32),
-            dibHeader: BMPDIBheader::new(width, height),
+            dib_header: BMPDIBheader::new(width, height),
             width: width,
             height: height,
             padding: width % 4,
-            paddingData: [0, 0, 0, 0],
+            padding_data: [0, 0, 0, 0],
             data: Some(data)
         }
     }
 
     pub fn set_pixel(&mut self, x: uint, y: uint, val: BMPpixel) {
-        if x < self.width as uint && y < self.height as uint { 
+        if x < self.width as uint && y < self.height as uint {
             match self.data {
                 Some(ref mut data) => data.insert(y * (self.width as uint) + x, val),
                 None => fail!("Image has no data")
@@ -126,7 +126,7 @@ impl BMPimage {
     pub fn get_pixel<'a>(&'a self, x: uint, y: uint) -> &'a BMPpixel {
         if x < self.width as uint && y < self.height as uint {
             match self.data {
-                Some(ref data) => data.get(y * (self.width as uint) + x),
+                Some(ref data) => data.index(&(y * (self.width as uint) + x)),
                 None => fail!("Image has no data")
             }
         } else {
@@ -140,23 +140,23 @@ impl BMPimage {
         access(f.write([id.magic1, id.magic2]));
 
         let header = self.header;
-        access(f.write_le_u32(header.fileSize));
+        access(f.write_le_u32(header.file_size));
         access(f.write_le_u16(header.creator1));
         access(f.write_le_u16(header.creator2));
-        access(f.write_le_u32(header.pixelOffset));
+        access(f.write_le_u32(header.pixel_offset));
 
-        let dib_header = self.dibHeader;
-        access(f.write_le_u32(dib_header.headerSize));
+        let dib_header = self.dib_header;
+        access(f.write_le_u32(dib_header.header_size));
         access(f.write_le_i32(dib_header.width));
         access(f.write_le_i32(dib_header.height));
-        access(f.write_le_u16(dib_header.numPlanes));
-        access(f.write_le_u16(dib_header.bitPrPixel));
-        access(f.write_le_u32(dib_header.compressType));
-        access(f.write_le_u32(dib_header.dataSize));
+        access(f.write_le_u16(dib_header.num_planes));
+        access(f.write_le_u16(dib_header.bits_per_pixel));
+        access(f.write_le_u32(dib_header.compress_type));
+        access(f.write_le_u32(dib_header.data_size));
         access(f.write_le_i32(dib_header.hres));
         access(f.write_le_i32(dib_header.vres));
-        access(f.write_le_u32(dib_header.numColors));
-        access(f.write_le_u32(dib_header.numImpColors));
+        access(f.write_le_u32(dib_header.num_colors));
+        access(f.write_le_u32(dib_header.num_imp_colors));
     }
 
     pub fn save(&self, name: &str) {
@@ -172,10 +172,10 @@ impl BMPimage {
                 for y in range(0, self.height) {
                     for x in range(0, self.width) {
                         let index: uint = (y * self.width + x) as uint;
-                        let p = data.get(index as uint);
+                        let p = data[index as uint];
                         access(file.write([p.r, p.g, p.b]));
                     }
-                    let p = self.paddingData.slice(0, self.padding as uint);
+                    let p = self.padding_data.slice(0, self.padding as uint);
                     access(file.write(p));
                 }
             },
@@ -183,9 +183,9 @@ impl BMPimage {
         }
     }
 
-    fn read_BMP_id(f: &mut File) -> Option<BMPid> {
+    fn read_bmp_id(f: &mut File) -> Option<BMPid> {
         match f.eof() {
-            false => 
+            false =>
                 Some(BMPid {
                     magic1: access(f.read_byte()),
                     magic2: access(f.read_byte())
@@ -194,34 +194,34 @@ impl BMPimage {
         }
     }
 
-    fn read_BMP_header(f: &mut File) -> Option<BMPheader> {
+    fn read_bmp_header(f: &mut File) -> Option<BMPheader> {
         match f.eof() {
-            false => 
+            false =>
                 Some(BMPheader {
-                    fileSize: access(f.read_le_u32()),
+                    file_size: access(f.read_le_u32()),
                     creator1: access(f.read_le_u16()),
                     creator2: access(f.read_le_u16()),
-                    pixelOffset: access(f.read_le_u32())
+                    pixel_offset: access(f.read_le_u32())
                 }),
             true => None
         }
     }
 
-    fn read_BMP_dib_header(f: &mut File) -> Option<BMPDIBheader> {
+    fn read_bmp_dib_header(f: &mut File) -> Option<BMPDIBheader> {
         match f.eof() {
-            false =>  
+            false =>
                 Some(BMPDIBheader {
-                    headerSize: access(f.read_le_u32()),
+                    header_size: access(f.read_le_u32()),
                     width: access(f.read_le_i32()),
                     height: access(f.read_le_i32()),
-                    numPlanes: access(f.read_le_u16()),
-                    bitPrPixel: access(f.read_le_u16()),
-                    compressType: access(f.read_le_u32()),
-                    dataSize: access(f.read_le_u32()),
+                    num_planes: access(f.read_le_u16()),
+                    bits_per_pixel: access(f.read_le_u16()),
+                    compress_type: access(f.read_le_u32()),
+                    data_size: access(f.read_le_u32()),
                     hres: access(f.read_le_i32()),
                     vres: access(f.read_le_i32()),
-                    numColors: access(f.read_le_u32()),
-                    numImpColors: access(f.read_le_u32()),
+                    num_colors: access(f.read_le_u32()),
+                    num_imp_colors: access(f.read_le_u32()),
                 }),
             true => None
         }
@@ -236,10 +236,10 @@ impl BMPimage {
     }
 
     fn read_image_data(f: &mut File, dh: BMPDIBheader, offset: u32, padding: i64) -> Option<Vec<BMPpixel>> {
-        let dataSize = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32 
+        let data_size = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32
             * 4 * dh.height as u32;
 
-        if dataSize == dh.dataSize {
+        if data_size == dh.data_size {
             let mut data = Vec::new();
             // seek until data
             access(f.seek(offset as i64, SeekSet));
@@ -256,40 +256,40 @@ impl BMPimage {
             None
         }
     }
-    
+
     pub fn open(name: &str) -> BMPimage {
         let mut f = match File::open_mode(&Path::new(name), Open, Read) {
             Ok(f) => f,
             Err(e) => fail!("File error: {}", e),
         };
 
-        let id = match BMPimage::read_BMP_id(&mut f) {
+        let id = match BMPimage::read_bmp_id(&mut f) {
             Some(id) => id,
             None => fail!("File is not a bitmap")
         };
         assert_eq!(id.magic1, 0x42);
         assert_eq!(id.magic2, 0x4D);
 
-        let header = match BMPimage::read_BMP_header(&mut f) {
+        let header = match BMPimage::read_bmp_header(&mut f) {
             Some(header) => header,
             None => fail!("Header of bitmap is not valid")
         };
 
-        let dibHeader = match BMPimage::read_BMP_dib_header(&mut f) {
-            Some(dibHeader) => dibHeader,
+        let dib_header = match BMPimage::read_bmp_dib_header(&mut f) {
+            Some(dib_header) => dib_header,
             None => fail!("DIB header of bitmap is not valid")
         };
 
-        let padding = dibHeader.width % 4;
+        let padding = dib_header.width % 4;
         BMPimage {
             magic: id,
             header: header,
-            dibHeader: dibHeader,
-            width: dibHeader.width,
-            height: dibHeader.height,
+            dib_header: dib_header,
+            width: dib_header.width,
+            height: dib_header.height,
             padding: padding,
-            paddingData: [0, 0, 0, 0],
-            data: BMPimage::read_image_data(&mut f, dibHeader, header.pixelOffset, padding as i64)
+            padding_data: [0, 0, 0, 0],
+            data: BMPimage::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64)
         }
     }
 }
@@ -336,23 +336,23 @@ mod tests {
 
     fn verify_test_bmp_image(img: BMPimage) {
         let header = img.header;
-        assert_eq!(70, header.fileSize);
+        assert_eq!(70, header.file_size);
         assert_eq!(0,  header.creator1);
         assert_eq!(0,  header.creator2);
-        assert_eq!(54, header.pixelOffset);
 
-        let dibHeader = img.dibHeader;
-        assert_eq!(40,    dibHeader.headerSize);
-        assert_eq!(2,     dibHeader.width);
-        assert_eq!(2,     dibHeader.height);
-        assert_eq!(1,     dibHeader.numPlanes);
-        assert_eq!(24,    dibHeader.bitPrPixel);
-        assert_eq!(0,     dibHeader.compressType);
-        assert_eq!(16,    dibHeader.dataSize);
-        assert_eq!(0x100, dibHeader.hres);
-        assert_eq!(0x100, dibHeader.vres);
-        assert_eq!(0,     dibHeader.numColors);
-        assert_eq!(0,     dibHeader.numImpColors);
+        let dib_header = img.dib_header;
+        assert_eq!(54, header.pixel_offset);
+        assert_eq!(40,    dib_header.header_size);
+        assert_eq!(2,     dib_header.width);
+        assert_eq!(2,     dib_header.height);
+        assert_eq!(1,     dib_header.num_planes);
+        assert_eq!(24,    dib_header.bits_per_pixel);
+        assert_eq!(0,     dib_header.compress_type);
+        assert_eq!(16,    dib_header.data_size);
+        assert_eq!(0x100, dib_header.hres);
+        assert_eq!(0x100, dib_header.vres);
+        assert_eq!(0,     dib_header.num_colors);
+        assert_eq!(0,     dib_header.num_imp_colors);
 
         assert_eq!(2, img.padding);
     }
@@ -394,7 +394,7 @@ mod tests {
         bmp.set_pixel(0, 1, BLUE);
         bmp.set_pixel(1, 1, GREEN);
         bmp.save("src/test/rgbw_test.bmp");
-        
+
         let bmpImg = BMPimage::open("src/test/rgbw_test.bmp");
         verify_test_bmp_image(bmpImg);
     }
