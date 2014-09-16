@@ -305,6 +305,7 @@ fn access<T>(res: IoResult<T>) -> T {
 mod tests {
     use std::mem::size_of;
     use std::io::{File, SeekSet};
+    use std::io::fs::PathExtensions;
 
     use BMPid;
     use BMPheader;
@@ -330,7 +331,7 @@ mod tests {
     #[test]
     fn size_of_4pixel_bmp_image_is_70_bytes() {
         let path_wd = Path::new("src/test/rgbw.bmp");
-        let size = path_wd.stat().unwrap().size as i32;
+        let size = path_wd.lstat().unwrap().size as i32;
         assert_eq!(70, size);
     }
 
@@ -359,8 +360,8 @@ mod tests {
 
     #[test]
     fn can_read_bmp_image() {
-        let bmpImg = BMPimage::open("src/test/rgbw.bmp");
-        verify_test_bmp_image(bmpImg);
+        let bmp_img = BMPimage::open("src/test/rgbw.bmp");
+        verify_test_bmp_image(bmp_img);
     }
 
     #[test]
@@ -395,18 +396,18 @@ mod tests {
         bmp.set_pixel(1, 1, GREEN);
         bmp.save("src/test/rgbw_test.bmp");
 
-        let bmpImg = BMPimage::open("src/test/rgbw_test.bmp");
-        verify_test_bmp_image(bmpImg);
+        let bmp_img = BMPimage::open("src/test/rgbw_test.bmp");
+        verify_test_bmp_image(bmp_img);
     }
 
     #[test]
     fn can_read_entire_bmp_image() {
-        let bmpImg = BMPimage::open("src/test/rgbw.bmp");
-        assert!(None != bmpImg.data);
+        let bmp_img = BMPimage::open("src/test/rgbw.bmp");
+        assert!(None != bmp_img.data);
 
-        assert_eq!(bmpImg.get_pixel(0, 0), &RED);
-        assert_eq!(bmpImg.get_pixel(1, 0), &WHITE);
-        assert_eq!(bmpImg.get_pixel(0, 1), &BLUE);
-        assert_eq!(bmpImg.get_pixel(1, 1), &GREEN);
+        assert_eq!(bmp_img.get_pixel(0, 0), &RED);
+        assert_eq!(bmp_img.get_pixel(1, 0), &WHITE);
+        assert_eq!(bmp_img.get_pixel(0, 1), &BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
     }
 }
