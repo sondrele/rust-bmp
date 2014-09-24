@@ -1,0 +1,6 @@
+[package]
+
+name = "bmp"
+version = "0.0.1"
+authors = ["Sondre Lefsaker"]
+

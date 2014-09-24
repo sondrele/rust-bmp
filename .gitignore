@@ -8,3 +8,5 @@
 
 # Test files
 *_test.bmp
+Cargo.lock
+target
