@@ -1,6 +1,22 @@
 use std::io::{File, Open, Read, Append, ReadWrite, IoResult,
     SeekSet, SeekCur};
 
+#[deriving(Show, PartialEq)]
+pub struct BMPpixel {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8
+}
+
+pub mod consts {
+    use BMPpixel;
+
+    pub static RED:   BMPpixel = BMPpixel{ r: 255, g: 0, b: 0 };
+    pub static GREEN: BMPpixel = BMPpixel{ r: 0, g: 255, b: 0 };
+    pub static BLUE:  BMPpixel = BMPpixel{ r: 0, g: 0, b: 255 };
+    pub static WHITE: BMPpixel = BMPpixel{ r: 255, g: 255, b: 255 };
+}
+
 #[deriving(Show)]
 struct BMPid {
     magic1: u8,
@@ -70,18 +86,6 @@ impl BMPDIBheader {
         }
     }
 }
-
-#[deriving(Show, PartialEq)]
-pub struct BMPpixel {
-    r: u8,
-    g: u8,
-    b: u8
-}
-
-pub static RED: BMPpixel = BMPpixel{ r: 255, g: 0, b: 0 };
-pub static GREEN: BMPpixel = BMPpixel{ r: 0, g: 255, b: 0 };
-pub static BLUE: BMPpixel = BMPpixel{ r: 0, g: 0, b: 255 };
-pub static WHITE: BMPpixel = BMPpixel{ r: 255, g: 255, b: 255 };
 
 pub struct BMPimage {
     magic: BMPid,
@@ -173,7 +177,7 @@ impl BMPimage {
                     for x in range(0, self.width) {
                         let index: uint = (y * self.width + x) as uint;
                         let p = data[index as uint];
-                        access(file.write([p.r, p.g, p.b]));
+                        access(file.write([p.b, p.g, p.r]));
                     }
                     let p = self.padding_data.slice(0, self.padding as uint);
                     access(file.write(p));
@@ -228,11 +232,12 @@ impl BMPimage {
     }
 
     fn read_pixel(f: &mut File) -> BMPpixel {
-        BMPpixel {
-            r: access(f.read_byte()),
-            g: access(f.read_byte()),
-            b: access(f.read_byte()),
-        }
+        let [b, g, r] = [
+            access(f.read_byte()),
+            access(f.read_byte()),
+            access(f.read_byte())
+        ];
+        BMPpixel{r: r, g: g, b: b}
     }
 
     fn read_image_data(f: &mut File, dh: BMPDIBheader, offset: u32, padding: i64) -> Option<Vec<BMPpixel>> {
@@ -312,10 +317,7 @@ mod tests {
     use BMPDIBheader;
     use BMPimage;
     use BMPpixel;
-    use RED;
-    use GREEN;
-    use BLUE;
-    use WHITE;
+    use consts::{RED, GREEN, BLUE, WHITE};
 
     #[test]
     fn size_of_bmp_header_is_54_bytes() {
@@ -388,6 +390,17 @@ mod tests {
     }
 
     #[test]
+    fn can_read_entire_bmp_image() {
+        let bmp_img = BMPimage::open("src/test/rgbw.bmp");
+        assert!(None != bmp_img.data);
+
+        assert_eq!(bmp_img.get_pixel(0, 0), &BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 0), &WHITE);
+        assert_eq!(bmp_img.get_pixel(0, 1), &RED);
+        assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
+    }
+
+    #[test]
     fn can_create_bmp_file() {
         let mut bmp = BMPimage::new(2, 2);
         bmp.set_pixel(0, 0, RED);
@@ -397,17 +410,11 @@ mod tests {
         bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = BMPimage::open("src/test/rgbw_test.bmp");
-        verify_test_bmp_image(bmp_img);
-    }
-
-    #[test]
-    fn can_read_entire_bmp_image() {
-        let bmp_img = BMPimage::open("src/test/rgbw.bmp");
-        assert!(None != bmp_img.data);
-
         assert_eq!(bmp_img.get_pixel(0, 0), &RED);
         assert_eq!(bmp_img.get_pixel(1, 0), &WHITE);
         assert_eq!(bmp_img.get_pixel(0, 1), &BLUE);
         assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
+
+        verify_test_bmp_image(bmp_img);
     }
 }
