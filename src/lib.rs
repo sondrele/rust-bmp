@@ -128,10 +128,10 @@ impl Image {
         }
     }
 
-    pub fn get_pixel<'a>(&'a self, x: uint, y: uint) -> &'a Pixel {
+    pub fn get_pixel(&self, x: uint, y: uint) -> Pixel {
         if x < self.width as uint && y < self.height as uint {
             match self.data {
-                Some(ref data) => data.index(&(y * (self.width as uint) + x)),
+                Some(ref data) => data[y * (self.width as uint) + x],
                 None => fail!("Image has no data")
             }
         } else {
@@ -395,10 +395,10 @@ mod tests {
         let bmp_img = Image::open("src/test/rgbw.bmp");
         assert!(None != bmp_img.data);
 
-        assert_eq!(bmp_img.get_pixel(0, 0), &BLUE);
-        assert_eq!(bmp_img.get_pixel(1, 0), &WHITE);
-        assert_eq!(bmp_img.get_pixel(0, 1), &RED);
-        assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
+        assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
+        assert_eq!(bmp_img.get_pixel(0, 1), RED);
+        assert_eq!(bmp_img.get_pixel(1, 1), GREEN);
     }
 
     #[test]
@@ -411,10 +411,10 @@ mod tests {
         bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = Image::open("src/test/rgbw_test.bmp");
-        assert_eq!(bmp_img.get_pixel(0, 0), &RED);
-        assert_eq!(bmp_img.get_pixel(1, 0), &WHITE);
-        assert_eq!(bmp_img.get_pixel(0, 1), &BLUE);
-        assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
+        assert_eq!(bmp_img.get_pixel(0, 0), RED);
+        assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
+        assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 1), GREEN);
 
         verify_test_bmp_image(bmp_img);
     }
@@ -425,7 +425,7 @@ mod tests {
         img.set_pixel(1, 0, WHITE);
         img.set_pixel(0, 0, WHITE);
 
-        assert_eq!(img.get_pixel(0, 0), &WHITE);
-        assert_eq!(img.get_pixel(1, 0), &WHITE);
+        assert_eq!(img.get_pixel(0, 0), WHITE);
+        assert_eq!(img.get_pixel(1, 0), WHITE);
     }
 }
