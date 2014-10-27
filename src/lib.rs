@@ -118,10 +118,11 @@ impl Image {
 
     pub fn set_pixel(&mut self, x: uint, y: uint, val: Pixel) {
         if x < self.width as uint && y < self.height as uint {
-            match self.data {
-                Some(ref mut data) => data.insert(y * (self.width as uint) + x, val),
+            let data = match self.data {
+                Some(ref mut data) => data.as_mut_slice(),
                 None => fail!("Image has no data")
-            }
+            };
+            data[y * (self.width as uint) + x] = val;
         } else {
             fail!("Index out of bounds: ({}, {})", x, y);
         }
@@ -416,5 +417,15 @@ mod tests {
         assert_eq!(bmp_img.get_pixel(1, 1), &GREEN);
 
         verify_test_bmp_image(bmp_img);
+    }
+
+    #[test]
+    fn changing_pixels_does_not_push_image_data() {
+        let mut img = Image::new(2, 1);
+        img.set_pixel(1, 0, WHITE);
+        img.set_pixel(0, 0, WHITE);
+
+        assert_eq!(img.get_pixel(0, 0), &WHITE);
+        assert_eq!(img.get_pixel(1, 0), &WHITE);
     }
 }
