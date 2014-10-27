@@ -1,12 +1,15 @@
 rust-bmp
 ========
 Small module for reading and writing bitmap images.
-Currently only 24-bit BMP images is supported.
+Currently only 24-bit RGB BMP images is supported.
 
 Usage
 -----
 Initialize a new image with the `new` function, specifying `width` and `height`.
 ```
+extern crate bmp;
+use bmp::Image;
+
 let mut img = Image::new(100, 100);
 ```
 Edit image data using the `get_pixel` and `set_pixel` functions.
