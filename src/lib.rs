@@ -8,14 +8,7 @@ pub struct Pixel {
     pub b: u8
 }
 
-pub mod consts {
-    use Pixel;
-
-    pub static RED:   Pixel = Pixel{r: 255, g: 0, b: 0};
-    pub static GREEN: Pixel = Pixel{r: 0, g: 255, b: 0};
-    pub static BLUE:  Pixel = Pixel{r: 0, g: 0, b: 255};
-    pub static WHITE: Pixel = Pixel{r: 255, g: 255, b: 255};
-}
+pub mod consts;
 
 #[deriving(Show)]
 struct BmpId {
@@ -318,7 +311,7 @@ mod tests {
     use BmpDibHeader;
     use Image;
     use Pixel;
-    use consts::{RED, GREEN, BLUE, WHITE};
+    use consts::{RED, LIME, BLUE, WHITE};
 
     #[test]
     fn size_of_bmp_header_is_54_bytes() {
@@ -398,7 +391,7 @@ mod tests {
         assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
         assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
         assert_eq!(bmp_img.get_pixel(0, 1), RED);
-        assert_eq!(bmp_img.get_pixel(1, 1), GREEN);
+        assert_eq!(bmp_img.get_pixel(1, 1), LIME);
     }
 
     #[test]
@@ -407,14 +400,14 @@ mod tests {
         bmp.set_pixel(0, 0, RED);
         bmp.set_pixel(1, 0, WHITE);
         bmp.set_pixel(0, 1, BLUE);
-        bmp.set_pixel(1, 1, GREEN);
+        bmp.set_pixel(1, 1, LIME);
         bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = Image::open("src/test/rgbw_test.bmp");
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
         assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
         assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
-        assert_eq!(bmp_img.get_pixel(1, 1), GREEN);
+        assert_eq!(bmp_img.get_pixel(1, 1), LIME);
 
         verify_test_bmp_image(bmp_img);
     }
