@@ -116,6 +116,14 @@ impl Image {
         }
     }
 
+    pub fn get_width(&self) -> uint {
+        self.width as uint
+    }
+
+    pub fn get_height(&self) -> uint {
+        self.height as uint
+    }
+
     pub fn set_pixel(&mut self, x: uint, y: uint, val: Pixel) {
         if x < self.width as uint && y < self.height as uint {
             let data = match self.data {
