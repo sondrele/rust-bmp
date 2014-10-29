@@ -99,18 +99,18 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(width: i32, height: i32) -> Image {
-        let mut data = Vec::with_capacity((width * height) as uint);
+    pub fn new(width: uint, height: uint) -> Image {
+        let mut data = Vec::with_capacity(width * height);
         for _ in range(0, width * height) {
             data.push(Pixel {r: 0, g: 0, b: 0});
         }
         Image {
             magic: BmpId::new(),
             header: BmpHeader::new(width as u32, height as u32),
-            dib_header: BmpDibHeader::new(width, height),
-            width: width,
-            height: height,
-            padding: width % 4,
+            dib_header: BmpDibHeader::new(width as i32, height as i32),
+            width: width as i32,
+            height: height as i32,
+            padding: width as i32 % 4,
             padding_data: [0, 0, 0, 0],
             data: Some(data)
         }
