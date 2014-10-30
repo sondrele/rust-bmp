@@ -88,34 +88,38 @@ pub struct Image {
     height: i32,
     padding: i32,
     padding_data: [u8, .. 4],
-    data: Option<Vec<Pixel>>
+    data: Vec<Pixel>
 }
 
 impl Image {
-    pub fn new(width: i32, height: i32) -> Image {
-        let mut data = Vec::with_capacity((width * height) as uint);
+    pub fn new(width: uint, height: uint) -> Image {
+        let mut data = Vec::with_capacity(width * height);
         for _ in range(0, width * height) {
             data.push(Pixel {r: 0, g: 0, b: 0});
         }
         Image {
             magic: BmpId::new(),
             header: BmpHeader::new(width as u32, height as u32),
-            dib_header: BmpDibHeader::new(width, height),
-            width: width,
-            height: height,
-            padding: width % 4,
+            dib_header: BmpDibHeader::new(width as i32, height as i32),
+            width: width as i32,
+            height: height as i32,
+            padding: width as i32 % 4,
             padding_data: [0, 0, 0, 0],
-            data: Some(data)
+            data: data
         }
+    }
+
+    pub fn get_width(&self) -> uint {
+        self.width as uint
+    }
+
+    pub fn get_height(&self) -> uint {
+        self.height as uint
     }
 
     pub fn set_pixel(&mut self, x: uint, y: uint, val: Pixel) {
         if x < self.width as uint && y < self.height as uint {
-            let data = match self.data {
-                Some(ref mut data) => data.as_mut_slice(),
-                None => fail!("Image has no data")
-            };
-            data[y * (self.width as uint) + x] = val;
+            self.data[y * (self.width as uint) + x] = val;
         } else {
             fail!("Index out of bounds: ({}, {})", x, y);
         }
@@ -123,10 +127,7 @@ impl Image {
 
     pub fn get_pixel(&self, x: uint, y: uint) -> Pixel {
         if x < self.width as uint && y < self.height as uint {
-            match self.data {
-                Some(ref data) => data[y * (self.width as uint) + x],
-                None => fail!("Image has no data")
-            }
+            self.data[y * (self.width as uint) + x]
         } else {
             fail!("Index out of bounds: ({}, {})", x, y);
         }
@@ -165,19 +166,14 @@ impl Image {
             Err(e) => fail!("File error: {}", e),
         };
 
-        match self.data {
-            Some(ref data) => {
-                for y in range(0, self.height) {
-                    for x in range(0, self.width) {
-                        let index: uint = (y * self.width + x) as uint;
-                        let p = data[index as uint];
-                        access(file.write([p.b, p.g, p.r]));
-                    }
-                    let p = self.padding_data.slice(0, self.padding as uint);
-                    access(file.write(p));
-                }
-            },
-            None => fail!("Image has no data")
+        for y in range(0, self.height) {
+            for x in range(0, self.width) {
+                let index = (y * self.width + x) as uint;
+                let p = self.data[index];
+                access(file.write([p.b, p.g, p.r]));
+            }
+            let p = self.padding_data.slice(0, self.padding as uint);
+            access(file.write(p));
         }
     }
 
@@ -280,6 +276,11 @@ impl Image {
         };
 
         let padding = dib_header.width % 4;
+        let data = match Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64) {
+            Some(data) => data,
+            None => fail!("Data of bitmap is not valid")
+        };
+
         Image {
             magic: id,
             header: header,
@@ -288,7 +289,7 @@ impl Image {
             height: dib_header.height,
             padding: padding,
             padding_data: [0, 0, 0, 0],
-            data: Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64)
+            data: data
         }
     }
 }
@@ -386,7 +387,7 @@ mod tests {
     #[test]
     fn can_read_entire_bmp_image() {
         let bmp_img = Image::open("src/test/rgbw.bmp");
-        assert!(None != bmp_img.data);
+        assert_eq!(bmp_img.data.len(), 4);
 
         assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
         assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
