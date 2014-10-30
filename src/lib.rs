@@ -1,5 +1,6 @@
 use std::io::{File, Open, Read, Append, ReadWrite, IoResult,
     SeekSet, SeekCur};
+use std::iter::Iterator;
 
 #[deriving(Show, PartialEq)]
 pub struct Pixel {
@@ -131,6 +132,10 @@ impl Image {
         } else {
             fail!("Index out of bounds: ({}, {})", x, y);
         }
+    }
+
+    pub fn coordinates(&self) -> ImageIndex {
+        ImageIndex::new(self.width as uint, self.height as uint)
     }
 
     fn write_header(&self, name: &str) {
@@ -301,17 +306,47 @@ fn access<T>(res: IoResult<T>) -> T {
     }
 }
 
+pub struct ImageIndex {
+    width: uint,
+    height: uint,
+    x: uint,
+    y: uint
+}
+
+impl ImageIndex {
+    fn new(width: uint, height: uint) -> ImageIndex {
+        ImageIndex {
+            width: width,
+            height: height,
+            x: 0,
+            y: 0
+        }
+    }
+}
+
+impl Iterator<(uint, uint)> for ImageIndex {
+    fn next(&mut self) -> Option<(uint, uint)> {
+        if self.x < self.width && self.y < self.height {
+            let this = Some((self.x, self.y));
+            self.x += 1;
+            if self.x == self.width {
+                self.x = 0;
+                self.y += 1;
+            }
+            this
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
     use std::io::{File, SeekSet};
     use std::io::fs::PathExtensions;
 
-    use BmpId;
-    use BmpHeader;
-    use BmpDibHeader;
-    use Image;
-    use Pixel;
+    use {BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
     use consts::{RED, LIME, BLUE, WHITE};
 
     #[test]
@@ -421,5 +456,17 @@ mod tests {
 
         assert_eq!(img.get_pixel(0, 0), WHITE);
         assert_eq!(img.get_pixel(1, 0), WHITE);
+    }
+
+    #[test]
+    fn coordinates_iterator_gives_x_and_y_in_row_major_order() {
+        let img = Image::new(2, 3);
+        let mut coords = img.coordinates();
+        assert_eq!(coords.next(), Some((0, 0)));
+        assert_eq!(coords.next(), Some((1, 0)));
+        assert_eq!(coords.next(), Some((0, 1)));
+        assert_eq!(coords.next(), Some((1, 1)));
+        assert_eq!(coords.next(), Some((0, 2)));
+        assert_eq!(coords.next(), Some((1, 2)));
     }
 }
