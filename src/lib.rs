@@ -88,7 +88,6 @@ pub struct Image {
     width: i32,
     height: i32,
     padding: i32,
-    padding_data: [u8, .. 4],
     data: Vec<Pixel>
 }
 
@@ -105,7 +104,6 @@ impl Image {
             width: width as i32,
             height: height as i32,
             padding: width as i32 % 4,
-            padding_data: [0, 0, 0, 0],
             data: data
         }
     }
@@ -138,6 +136,63 @@ impl Image {
         ImageIndex::new(self.width as uint, self.height as uint)
     }
 
+    pub fn open(name: &str) -> Image {
+        let mut f = match File::open_mode(&Path::new(name), Open, Read) {
+            Ok(f) => f,
+            Err(e) => fail!("File error: {}", e),
+        };
+
+        let id = match Image::read_bmp_id(&mut f) {
+            Ok(id) => id,
+            Err(e) => fail!("File is not a bitmap: {}", e)
+        };
+        assert_eq!(id.magic1, 0x42);
+        assert_eq!(id.magic2, 0x4D);
+
+        let header = match Image::read_bmp_header(&mut f) {
+            Ok(header) => header,
+            Err(e) => fail!("Header of bitmap is not valid: {}", e)
+        };
+
+        let dib_header = match Image::read_bmp_dib_header(&mut f) {
+            Ok(dib_header) => dib_header,
+            Err(e) => fail!("DIB header of bitmap is not valid: {}", e)
+        };
+
+        let padding = dib_header.width % 4;
+        let data = match Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64) {
+            Ok(data) => data,
+            Err(e) => fail!("Data of bitmap is not valid: {}", e)
+        };
+
+        Image {
+            magic: id,
+            header: header,
+            dib_header: dib_header,
+            width: dib_header.width,
+            height: dib_header.height,
+            padding: padding,
+            data: data
+        }
+    }
+
+    pub fn save(&self, name: &str) {
+        let mut f = match File::create(&Path::new(name)) {
+            Ok(f) => f,
+            Err(e) => fail!("File error: {}", e)
+        };
+
+        match self.write_header(&mut f) {
+            Ok(_) => (),
+            Err(e) => fail!("File error: {}", e)
+        }
+
+        match self.write_data(f) {
+            Ok(_) => (),
+            Err(e) => fail!("File error: {}", e)
+        }
+    }
+
     fn write_header(&self, f: &mut File) -> IoResult<()> {
         let id = self.magic;
         try!(f.write([id.magic1, id.magic2]));
@@ -166,7 +221,8 @@ impl Image {
     fn write_data(&self, file: File) -> IoResult<()> {
         let mut stream = BufferedStream::new(file);
 
-        let padding = self.padding_data.slice(0, self.padding as uint);
+        let padding_data = [0, ..4];
+        let padding = padding_data.slice(0, self.padding as uint);
         for y in range(0, self.height) {
             for x in range(0, self.width) {
                 let index = (y * self.width + x) as uint;
@@ -176,23 +232,6 @@ impl Image {
             try!(stream.write(padding));
         }
         Ok(())
-    }
-
-    pub fn save(&self, name: &str) {
-        let mut f = match File::create(&Path::new(name)) {
-            Ok(f) => f,
-            Err(e) => fail!("File error: {}", e)
-        };
-
-        match self.write_header(&mut f) {
-            Ok(_) => (),
-            Err(e) => fail!("File error: {}", e)
-        }
-
-        match self.write_data(f) {
-            Ok(_) => (),
-            Err(e) => fail!("File error: {}", e)
-        }
     }
 
     fn read_bmp_id(f: &mut File) -> IoResult<BmpId> {
@@ -252,47 +291,6 @@ impl Image {
         } else {
             fail!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
                 data_size, dh.data_size)
-        }
-    }
-
-    pub fn open(name: &str) -> Image {
-        let mut f = match File::open_mode(&Path::new(name), Open, Read) {
-            Ok(f) => f,
-            Err(e) => fail!("File error: {}", e),
-        };
-
-        let id = match Image::read_bmp_id(&mut f) {
-            Ok(id) => id,
-            Err(e) => fail!("File is not a bitmap: {}", e)
-        };
-        assert_eq!(id.magic1, 0x42);
-        assert_eq!(id.magic2, 0x4D);
-
-        let header = match Image::read_bmp_header(&mut f) {
-            Ok(header) => header,
-            Err(e) => fail!("Header of bitmap is not valid: {}", e)
-        };
-
-        let dib_header = match Image::read_bmp_dib_header(&mut f) {
-            Ok(dib_header) => dib_header,
-            Err(e) => fail!("DIB header of bitmap is not valid: {}", e)
-        };
-
-        let padding = dib_header.width % 4;
-        let data = match Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64) {
-            Ok(data) => data,
-            Err(e) => fail!("Data of bitmap is not valid: {}", e)
-        };
-
-        Image {
-            magic: id,
-            header: header,
-            dib_header: dib_header,
-            width: dib_header.width,
-            height: dib_header.height,
-            padding: padding,
-            padding_data: [0, 0, 0, 0],
-            data: data
         }
     }
 }
