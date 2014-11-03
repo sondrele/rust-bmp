@@ -1,4 +1,4 @@
-use std::io::{BufferedStream, File, Open, Read, Append, ReadWrite, IoResult,
+use std::io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
 use std::iter::Iterator;
 
@@ -138,38 +138,32 @@ impl Image {
         ImageIndex::new(self.width as uint, self.height as uint)
     }
 
-    fn write_header(&self, name: &str) {
-        let mut f = File::create(&Path::new(name));
+    fn write_header(&self, f: &mut File) -> IoResult<()> {
         let id = self.magic;
-        access(f.write([id.magic1, id.magic2]));
+        try!(f.write([id.magic1, id.magic2]));
 
         let header = self.header;
-        access(f.write_le_u32(header.file_size));
-        access(f.write_le_u16(header.creator1));
-        access(f.write_le_u16(header.creator2));
-        access(f.write_le_u32(header.pixel_offset));
+        try!(f.write_le_u32(header.file_size));
+        try!(f.write_le_u16(header.creator1));
+        try!(f.write_le_u16(header.creator2));
+        try!(f.write_le_u32(header.pixel_offset));
 
         let dib_header = self.dib_header;
-        access(f.write_le_u32(dib_header.header_size));
-        access(f.write_le_i32(dib_header.width));
-        access(f.write_le_i32(dib_header.height));
-        access(f.write_le_u16(dib_header.num_planes));
-        access(f.write_le_u16(dib_header.bits_per_pixel));
-        access(f.write_le_u32(dib_header.compress_type));
-        access(f.write_le_u32(dib_header.data_size));
-        access(f.write_le_i32(dib_header.hres));
-        access(f.write_le_i32(dib_header.vres));
-        access(f.write_le_u32(dib_header.num_colors));
-        access(f.write_le_u32(dib_header.num_imp_colors));
+        try!(f.write_le_u32(dib_header.header_size));
+        try!(f.write_le_i32(dib_header.width));
+        try!(f.write_le_i32(dib_header.height));
+        try!(f.write_le_u16(dib_header.num_planes));
+        try!(f.write_le_u16(dib_header.bits_per_pixel));
+        try!(f.write_le_u32(dib_header.compress_type));
+        try!(f.write_le_u32(dib_header.data_size));
+        try!(f.write_le_i32(dib_header.hres));
+        try!(f.write_le_i32(dib_header.vres));
+        try!(f.write_le_u32(dib_header.num_colors));
+        try!(f.write_le_u32(dib_header.num_imp_colors));
+        Ok(())
     }
 
-    pub fn save(&self, name: &str) {
-        self.write_header(name);
-
-        let file = match File::open_mode(&Path::new(name), Append, ReadWrite) {
-            Ok(f) => f,
-            Err(e) => fail!("File error: {}", e),
-        };
+    fn write_data(&self, file: File) -> IoResult<()> {
         let mut stream = BufferedStream::new(file);
 
         let padding = self.padding_data.slice(0, self.padding as uint);
@@ -177,84 +171,87 @@ impl Image {
             for x in range(0, self.width) {
                 let index = (y * self.width + x) as uint;
                 let px = self.data[index];
-                access(stream.write([px.b, px.g, px.r]));
+                try!(stream.write([px.b, px.g, px.r]));
             }
-            access(stream.write(padding));
+            try!(stream.write(padding));
+        }
+        Ok(())
+    }
+
+    pub fn save(&self, name: &str) {
+        let mut f = match File::create(&Path::new(name)) {
+            Ok(f) => f,
+            Err(e) => fail!("File error: {}", e)
+        };
+
+        match self.write_header(&mut f) {
+            Ok(_) => (),
+            Err(e) => fail!("File error: {}", e)
+        }
+
+        match self.write_data(f) {
+            Ok(_) => (),
+            Err(e) => fail!("File error: {}", e)
         }
     }
 
-    fn read_bmp_id(f: &mut File) -> Option<BmpId> {
-        match f.eof() {
-            false =>
-                Some(BmpId {
-                    magic1: access(f.read_byte()),
-                    magic2: access(f.read_byte())
-                }),
-            true => None
-        }
+    fn read_bmp_id(f: &mut File) -> IoResult<BmpId> {
+        Ok(BmpId {
+            magic1: try!(f.read_byte()),
+            magic2: try!(f.read_byte())
+        })
     }
 
-    fn read_bmp_header(f: &mut File) -> Option<BmpHeader> {
-        match f.eof() {
-            false =>
-                Some(BmpHeader {
-                    file_size: access(f.read_le_u32()),
-                    creator1: access(f.read_le_u16()),
-                    creator2: access(f.read_le_u16()),
-                    pixel_offset: access(f.read_le_u32())
-                }),
-            true => None
-        }
+    fn read_bmp_header(f: &mut File) -> IoResult<BmpHeader> {
+        Ok(BmpHeader {
+            file_size: try!(f.read_le_u32()),
+            creator1: try!(f.read_le_u16()),
+            creator2: try!(f.read_le_u16()),
+            pixel_offset: try!(f.read_le_u32())
+        })
     }
 
-    fn read_bmp_dib_header(f: &mut File) -> Option<BmpDibHeader> {
-        match f.eof() {
-            false =>
-                Some(BmpDibHeader {
-                    header_size: access(f.read_le_u32()),
-                    width: access(f.read_le_i32()),
-                    height: access(f.read_le_i32()),
-                    num_planes: access(f.read_le_u16()),
-                    bits_per_pixel: access(f.read_le_u16()),
-                    compress_type: access(f.read_le_u32()),
-                    data_size: access(f.read_le_u32()),
-                    hres: access(f.read_le_i32()),
-                    vres: access(f.read_le_i32()),
-                    num_colors: access(f.read_le_u32()),
-                    num_imp_colors: access(f.read_le_u32()),
-                }),
-            true => None
-        }
+    fn read_bmp_dib_header(f: &mut File) -> IoResult<BmpDibHeader> {
+        Ok(BmpDibHeader {
+            header_size: try!(f.read_le_u32()),
+            width: try!(f.read_le_i32()),
+            height: try!(f.read_le_i32()),
+            num_planes: try!(f.read_le_u16()),
+            bits_per_pixel: try!(f.read_le_u16()),
+            compress_type: try!(f.read_le_u32()),
+            data_size: try!(f.read_le_u32()),
+            hres: try!(f.read_le_i32()),
+            vres: try!(f.read_le_i32()),
+            num_colors: try!(f.read_le_u32()),
+            num_imp_colors: try!(f.read_le_u32()),
+        })
     }
 
-    fn read_pixel(f: &mut File) -> Pixel {
-        let [b, g, r] = [
-            access(f.read_byte()),
-            access(f.read_byte()),
-            access(f.read_byte())
-        ];
-        Pixel{r: r, g: g, b: b}
-    }
-
-    fn read_image_data(f: &mut File, dh: BmpDibHeader, offset: u32, padding: i64) -> Option<Vec<Pixel>> {
+    fn read_image_data(f: &mut File, dh: BmpDibHeader, offset: u32, padding: i64) -> IoResult<Vec<Pixel>> {
         let data_size = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32
             * 4 * dh.height as u32;
 
         if data_size == dh.data_size {
             let mut data = Vec::new();
             // seek until data
-            access(f.seek(offset as i64, SeekSet));
+            try!(f.seek(offset as i64, SeekSet));
             // read pixels until padding
             for _ in range(0, dh.height) {
                 for _ in range(0, dh.width) {
-                   data.push(Image::read_pixel(f));
+                    let [b, g, r] = [
+                        try!(f.read_byte()),
+                        try!(f.read_byte()),
+                        try!(f.read_byte())
+                    ];
+                    data.push(Pixel {r: r, g: g, b: b});
                 }
                 // seek padding
-                access(f.seek(padding, SeekCur));
+                try!(f.seek(padding, SeekCur));
             }
-            Some(data)
+            Ok(data)
         } else {
-            None
+            fail!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
+                data_size, dh.data_size)
         }
     }
 
@@ -265,26 +262,26 @@ impl Image {
         };
 
         let id = match Image::read_bmp_id(&mut f) {
-            Some(id) => id,
-            None => fail!("File is not a bitmap")
+            Ok(id) => id,
+            Err(e) => fail!("File is not a bitmap: {}", e)
         };
         assert_eq!(id.magic1, 0x42);
         assert_eq!(id.magic2, 0x4D);
 
         let header = match Image::read_bmp_header(&mut f) {
-            Some(header) => header,
-            None => fail!("Header of bitmap is not valid")
+            Ok(header) => header,
+            Err(e) => fail!("Header of bitmap is not valid: {}", e)
         };
 
         let dib_header = match Image::read_bmp_dib_header(&mut f) {
-            Some(dib_header) => dib_header,
-            None => fail!("DIB header of bitmap is not valid")
+            Ok(dib_header) => dib_header,
+            Err(e) => fail!("DIB header of bitmap is not valid: {}", e)
         };
 
         let padding = dib_header.width % 4;
         let data = match Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64) {
-            Some(data) => data,
-            None => fail!("Data of bitmap is not valid")
+            Ok(data) => data,
+            Err(e) => fail!("Data of bitmap is not valid: {}", e)
         };
 
         Image {
@@ -297,13 +294,6 @@ impl Image {
             padding_data: [0, 0, 0, 0],
             data: data
         }
-    }
-}
-
-fn access<T>(res: IoResult<T>) -> T {
-    match res {
-        Err(e) => fail!("File error: {}", e),
-        Ok(r) => r
     }
 }
 
