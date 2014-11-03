@@ -465,6 +465,6 @@ mod tests {
     #[bench]
     fn write_10x10_bmp(b: &mut Bencher) {
         let img = Image::new(10, 10);
-        b.iter(|| img.save("src/test/bench_img.bmp"));
+        b.iter(|| img.save("src/test/bench_test.bmp"));
     }
 }
