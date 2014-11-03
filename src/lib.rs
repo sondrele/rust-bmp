@@ -1,4 +1,4 @@
-use std::io::{File, Open, Read, Append, ReadWrite, IoResult,
+use std::io::{BufferedStream, File, Open, Read, Append, ReadWrite, IoResult,
     SeekSet, SeekCur};
 use std::iter::Iterator;
 
@@ -166,19 +166,20 @@ impl Image {
     pub fn save(&self, name: &str) {
         self.write_header(name);
 
-        let mut file = match File::open_mode(&Path::new(name), Append, ReadWrite) {
+        let file = match File::open_mode(&Path::new(name), Append, ReadWrite) {
             Ok(f) => f,
             Err(e) => fail!("File error: {}", e),
         };
+        let mut stream = BufferedStream::new(file);
 
+        let padding = self.padding_data.slice(0, self.padding as uint);
         for y in range(0, self.height) {
             for x in range(0, self.width) {
                 let index = (y * self.width + x) as uint;
-                let p = self.data[index];
-                access(file.write([p.b, p.g, p.r]));
+                let px = self.data[index];
+                access(stream.write([px.b, px.g, px.r]));
             }
-            let p = self.padding_data.slice(0, self.padding as uint);
-            access(file.write(p));
+            access(stream.write(padding));
         }
     }
 
@@ -342,6 +343,9 @@ impl Iterator<(uint, uint)> for ImageIndex {
 
 #[cfg(test)]
 mod tests {
+    extern crate test;
+
+    use self::test::Bencher;
     use std::mem::size_of;
     use std::io::{File, SeekSet};
     use std::io::fs::PathExtensions;
@@ -468,5 +472,11 @@ mod tests {
         assert_eq!(coords.next(), Some((1, 1)));
         assert_eq!(coords.next(), Some((0, 2)));
         assert_eq!(coords.next(), Some((1, 2)));
+    }
+
+    #[bench]
+    fn write_10x10_bmp(b: &mut Bencher) {
+        let img = Image::new(10, 10);
+        b.iter(|| img.save("src/test/bench_img.bmp"));
     }
 }
