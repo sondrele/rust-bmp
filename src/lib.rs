@@ -1,6 +1,7 @@
+use std::fmt;
+use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
-use std::iter::Iterator;
 
 #[deriving(Show, PartialEq)]
 pub struct Pixel {
@@ -296,6 +297,15 @@ impl Image {
             fail!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
                 data_size, dh.data_size)
         }
+    }
+}
+
+impl fmt::Show for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "{}\n", self.magic));
+        try!(write!(f, "{}\n", self.header));
+        try!(write!(f, "{}\n", self.dib_header));
+        write!(f, "Padding: {}\n", self.padding)
     }
 }
 
