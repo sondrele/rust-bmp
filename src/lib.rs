@@ -35,12 +35,12 @@ struct BmpHeader {
 }
 
 impl BmpHeader {
-    pub fn new(width: u32, height: u32) -> BmpHeader {
+    pub fn new(header_size: u32, data_size: u32) -> BmpHeader {
         BmpHeader {
-            file_size: width * height * 4 /* bytes per pixel */ + 54 /* Header size */,
+            file_size: header_size + data_size,
             creator1: 0 /* Unused */,
             creator2: 0 /* Unused */,
-            pixel_offset: 54
+            pixel_offset: header_size
         }
     }
 }
@@ -97,13 +97,17 @@ impl Image {
         for _ in range(0, width * height) {
             data.push(Pixel {r: 0, g: 0, b: 0});
         }
+
+        let padding = width as uint % 4;
+        let header_size = 54;
+        let data_size = (width * height * 3 + height * padding) as u32;
         Image {
             magic: BmpId::new(),
-            header: BmpHeader::new(width as u32, height as u32),
+            header: BmpHeader::new(header_size, data_size),
             dib_header: BmpDibHeader::new(width as i32, height as i32),
             width: width as i32,
             height: height as i32,
-            padding: width as i32 % 4,
+            padding: padding as i32,
             data: data
         }
     }
@@ -425,16 +429,16 @@ mod tests {
     #[test]
     fn can_create_bmp_file() {
         let mut bmp = Image::new(2, 2);
-        bmp.set_pixel(0, 0, RED);
+        bmp.set_pixel(0, 0, BLUE);
         bmp.set_pixel(1, 0, WHITE);
-        bmp.set_pixel(0, 1, BLUE);
+        bmp.set_pixel(0, 1, RED);
         bmp.set_pixel(1, 1, LIME);
         bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = Image::open("src/test/rgbw_test.bmp");
-        assert_eq!(bmp_img.get_pixel(0, 0), RED);
+        assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
         assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
-        assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
+        assert_eq!(bmp_img.get_pixel(0, 1), RED);
         assert_eq!(bmp_img.get_pixel(1, 1), LIME);
 
         verify_test_bmp_image(bmp_img);
