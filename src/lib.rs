@@ -1,4 +1,5 @@
 use std::fmt;
+use std::num::Float;
 use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
@@ -125,7 +126,7 @@ impl Image {
         if x < self.width as uint && y < self.height as uint {
             self.data[y * (self.width as uint) + x] = val;
         } else {
-            fail!("Index out of bounds: ({}, {})", x, y);
+            panic!("Index out of bounds: ({}, {})", x, y);
         }
     }
 
@@ -133,7 +134,7 @@ impl Image {
         if x < self.width as uint && y < self.height as uint {
             self.data[y * (self.width as uint) + x]
         } else {
-            fail!("Index out of bounds: ({}, {})", x, y);
+            panic!("Index out of bounds: ({}, {})", x, y);
         }
     }
 
@@ -144,30 +145,32 @@ impl Image {
     pub fn open(name: &str) -> Image {
         let mut f = match File::open_mode(&Path::new(name), Open, Read) {
             Ok(f) => f,
-            Err(e) => fail!("File error: {}", e),
+            Err(e) => panic!("File error: {}", e),
         };
 
         let id = match Image::read_bmp_id(&mut f) {
             Ok(id) => id,
-            Err(e) => fail!("File is not a bitmap: {}", e)
+            Err(e) => panic!("File is not a bitmap: {}", e)
         };
         assert_eq!(id.magic1, 0x42);
         assert_eq!(id.magic2, 0x4D);
 
         let header = match Image::read_bmp_header(&mut f) {
             Ok(header) => header,
-            Err(e) => fail!("Header of bitmap is not valid: {}", e)
+            Err(e) => panic!("Header of bitmap is not valid: {}", e)
         };
 
         let dib_header = match Image::read_bmp_dib_header(&mut f) {
             Ok(dib_header) => dib_header,
-            Err(e) => fail!("DIB header of bitmap is not valid: {}", e)
+            Err(e) => panic!("DIB header of bitmap is not valid: {}", e)
         };
 
         let padding = dib_header.width % 4;
-        let data = match Image::read_image_data(&mut f, dib_header, header.pixel_offset, padding as i64) {
+        let data = match Image::read_image_data(&mut f, dib_header,
+                                                header.pixel_offset,
+                                                padding as i64) {
             Ok(data) => data,
-            Err(e) => fail!("Data of bitmap is not valid: {}", e)
+            Err(e) => panic!("Data of bitmap is not valid: {}", e)
         };
 
         Image {
@@ -184,23 +187,23 @@ impl Image {
     pub fn save(&self, name: &str) {
         let mut f = match File::create(&Path::new(name)) {
             Ok(f) => f,
-            Err(e) => fail!("File error: {}", e)
+            Err(e) => panic!("File error: {}", e)
         };
 
         match self.write_header(&mut f) {
             Ok(_) => (),
-            Err(e) => fail!("File error: {}", e)
+            Err(e) => panic!("File error: {}", e)
         }
 
         match self.write_data(f) {
             Ok(_) => (),
-            Err(e) => fail!("File error: {}", e)
+            Err(e) => panic!("File error: {}", e)
         }
     }
 
     fn write_header(&self, f: &mut File) -> IoResult<()> {
         let id = self.magic;
-        try!(f.write([id.magic1, id.magic2]));
+        try!(f.write(&[id.magic1, id.magic2]));
 
         let header = self.header;
         try!(f.write_le_u32(header.file_size));
@@ -232,7 +235,7 @@ impl Image {
             for x in range(0, self.width) {
                 let index = (y * self.width + x) as uint;
                 let px = self.data[index];
-                try!(stream.write([px.b, px.g, px.r]));
+                try!(stream.write(&[px.b, px.g, px.r]));
             }
             try!(stream.write(padding));
         }
@@ -271,7 +274,8 @@ impl Image {
         })
     }
 
-    fn read_image_data(f: &mut File, dh: BmpDibHeader, offset: u32, padding: i64) -> IoResult<Vec<Pixel>> {
+    fn read_image_data(f: &mut File, dh: BmpDibHeader, offset: u32, padding: i64) ->
+    IoResult<Vec<Pixel>> {
         let data_size = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32
             * 4 * dh.height as u32;
 
@@ -294,7 +298,7 @@ impl Image {
             }
             Ok(data)
         } else {
-            fail!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
+            panic!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
                 data_size, dh.data_size)
         }
     }
@@ -406,14 +410,14 @@ mod tests {
     fn can_read_image_data() {
         let mut f = match File::open(&Path::new("src/test/rgbw.bmp"), ) {
             Ok(file) => file,
-            Err(e) => fail!("File error: {}", e)
+            Err(e) => panic!("File error: {}", e)
         };
         assert_eq!(0x42, f.read_byte().unwrap());
         assert_eq!(0x4D, f.read_byte().unwrap());
 
         match f.seek(54, SeekSet) {
             Ok(_) => (),
-            Err(e) => fail!("Seek error: {}", e)
+            Err(e) => panic!("Seek error: {}", e)
         }
 
         let pixel = Pixel {
