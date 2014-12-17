@@ -4,7 +4,7 @@ use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
 
-#[deriving(Show, PartialEq)]
+#[deriving(Show, PartialEq, Copy)]
 pub struct Pixel {
     pub r: u8,
     pub g: u8,
@@ -166,19 +166,22 @@ impl Image {
         };
 
         let padding = dib_header.width % 4;
-        let data = match Image::read_image_data(&mut f, dib_header,
+        let data = match Image::read_image_data(&mut f, &dib_header,
                                                 header.pixel_offset,
                                                 padding as i64) {
             Ok(data) => data,
             Err(e) => panic!("Data of bitmap is not valid: {}", e)
         };
 
+        let width = dib_header.width;
+        let height = dib_header.height;
+
         Image {
             magic: id,
             header: header,
             dib_header: dib_header,
-            width: dib_header.width,
-            height: dib_header.height,
+            width: width,
+            height: height,
             padding: padding,
             data: data
         }
@@ -202,16 +205,16 @@ impl Image {
     }
 
     fn write_header(&self, f: &mut File) -> IoResult<()> {
-        let id = self.magic;
+        let id = &self.magic;
         try!(f.write(&[id.magic1, id.magic2]));
 
-        let header = self.header;
+        let header = &self.header;
         try!(f.write_le_u32(header.file_size));
         try!(f.write_le_u16(header.creator1));
         try!(f.write_le_u16(header.creator2));
         try!(f.write_le_u32(header.pixel_offset));
 
-        let dib_header = self.dib_header;
+        let dib_header = &self.dib_header;
         try!(f.write_le_u32(dib_header.header_size));
         try!(f.write_le_i32(dib_header.width));
         try!(f.write_le_i32(dib_header.height));
@@ -234,7 +237,7 @@ impl Image {
         for y in range(0, self.height) {
             for x in range(0, self.width) {
                 let index = (y * self.width + x) as uint;
-                let px = self.data[index];
+                let px = &self.data[index];
                 try!(stream.write(&[px.b, px.g, px.r]));
             }
             try!(stream.write(padding));
@@ -274,7 +277,7 @@ impl Image {
         })
     }
 
-    fn read_image_data(f: &mut File, dh: BmpDibHeader, offset: u32, padding: i64) ->
+    fn read_image_data(f: &mut File, dh: &BmpDibHeader, offset: u32, padding: i64) ->
     IoResult<Vec<Pixel>> {
         let data_size = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32
             * 4 * dh.height as u32;
@@ -313,6 +316,7 @@ impl fmt::Show for Image {
     }
 }
 
+#[deriving(Copy)]
 pub struct ImageIndex {
     width: uint,
     height: uint,
