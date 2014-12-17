@@ -1,7 +1,9 @@
 rust-bmp
 ========
+[![Build Status](https://travis-ci.org/sondrele/rust-bmp.svg?branch=master)](https://travis-ci.org/sondrele/rust-bmp)
+
 Small module for reading and writing bitmap images.
-Currently only 24-bit RGB BMP images is supported.
+Currently only 24-bit RGB BMP images are supported.
 
 Usage
 -----
