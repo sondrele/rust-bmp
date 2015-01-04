@@ -1,10 +1,12 @@
+#![feature(associated_types)]
+
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
 
-#[deriving(Show, PartialEq, Copy)]
+#[derive(Show, PartialEq, Copy)]
 pub struct Pixel {
     pub r: u8,
     pub g: u8,
@@ -13,7 +15,7 @@ pub struct Pixel {
 
 pub mod consts;
 
-#[deriving(Show)]
+#[derive(Show)]
 struct BmpId {
     magic1: u8,
     magic2: u8
@@ -28,7 +30,7 @@ impl BmpId {
     }
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 struct BmpHeader {
     file_size: u32,
     creator1: u16,
@@ -47,7 +49,7 @@ impl BmpHeader {
     }
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 struct BmpDibHeader {
     header_size: u32,
     width: i32,
@@ -232,7 +234,7 @@ impl Image {
     fn write_data(&self, file: File) -> IoResult<()> {
         let mut stream = BufferedStream::new(file);
 
-        let padding_data = [0, ..4];
+        let padding_data = [0, 0, 0, 0];
         let padding = padding_data.slice(0, self.padding as uint);
         for y in range(0, self.height) {
             for x in range(0, self.width) {
@@ -316,7 +318,7 @@ impl fmt::Show for Image {
     }
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct ImageIndex {
     width: uint,
     height: uint,
@@ -335,7 +337,9 @@ impl ImageIndex {
     }
 }
 
-impl Iterator<(uint, uint)> for ImageIndex {
+impl Iterator for ImageIndex {
+    type Item = (uint, uint);
+
     fn next(&mut self) -> Option<(uint, uint)> {
         if self.x < self.width && self.y < self.height {
             let this = Some((self.x, self.y));
