@@ -1,5 +1,3 @@
-#![feature(associated_types)]
-
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
