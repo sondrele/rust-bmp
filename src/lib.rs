@@ -1,4 +1,3 @@
-use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
@@ -94,13 +93,13 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(width: uint, height: uint) -> Image {
+    pub fn new(width: usize, height: usize) -> Image {
         let mut data = Vec::with_capacity(width * height);
-        for _ in range(0, width * height) {
+        for _ in (0 .. width * height) {
             data.push(Pixel {r: 0, g: 0, b: 0});
         }
 
-        let padding = width as uint % 4;
+        let padding = width % 4;
         let header_size = 54;
         let data_size = (width * height * 3 + height * padding) as u32;
         Image {
@@ -114,32 +113,32 @@ impl Image {
         }
     }
 
-    pub fn get_width(&self) -> uint {
-        self.width as uint
+    pub fn get_width(&self) -> usize {
+        self.width as usize
     }
 
-    pub fn get_height(&self) -> uint {
-        self.height as uint
+    pub fn get_height(&self) -> usize {
+        self.height as usize
     }
 
-    pub fn set_pixel(&mut self, x: uint, y: uint, val: Pixel) {
-        if x < self.width as uint && y < self.height as uint {
-            self.data[y * (self.width as uint) + x] = val;
+    pub fn set_pixel(&mut self, x: usize, y: usize, val: Pixel) {
+        if x < self.width as usize && y < self.height as usize {
+            self.data[y * (self.width as usize) + x] = val;
         } else {
             panic!("Index out of bounds: ({}, {})", x, y);
         }
     }
 
-    pub fn get_pixel(&self, x: uint, y: uint) -> Pixel {
-        if x < self.width as uint && y < self.height as uint {
-            self.data[y * (self.width as uint) + x]
+    pub fn get_pixel(&self, x: usize, y: usize) -> Pixel {
+        if x < self.width as usize && y < self.height as usize {
+            self.data[y * (self.width as usize) + x]
         } else {
             panic!("Index out of bounds: ({}, {})", x, y);
         }
     }
 
     pub fn coordinates(&self) -> ImageIndex {
-        ImageIndex::new(self.width as uint, self.height as uint)
+        ImageIndex::new(self.width as usize, self.height as usize)
     }
 
     pub fn open(name: &str) -> Image {
@@ -232,11 +231,11 @@ impl Image {
     fn write_data(&self, file: File) -> IoResult<()> {
         let mut stream = BufferedStream::new(file);
 
-        let padding_data = [0, 0, 0, 0];
-        let padding = padding_data.slice(0, self.padding as uint);
-        for y in range(0, self.height) {
-            for x in range(0, self.width) {
-                let index = (y * self.width + x) as uint;
+        let padding_data: [u8; 4] = [0; 4];
+        let padding = padding_data.slice(0, self.padding as usize);
+        for y in (0 .. self.height) {
+            for x in (0 .. self.width) {
+                let index = (y * self.width + x) as usize;
                 let px = &self.data[index];
                 try!(stream.write(&[px.b, px.g, px.r]));
             }
@@ -287,8 +286,8 @@ impl Image {
             // seek until data
             try!(f.seek(offset as i64, SeekSet));
             // read pixels until padding
-            for _ in range(0, dh.height) {
-                for _ in range(0, dh.width) {
+            for _ in (0 .. dh.height) {
+                for _ in (0 .. dh.width) {
                     let [b, g, r] = [
                         try!(f.read_byte()),
                         try!(f.read_byte()),
@@ -307,25 +306,16 @@ impl Image {
     }
 }
 
-impl fmt::Show for Image {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "{}\n", self.magic));
-        try!(write!(f, "{}\n", self.header));
-        try!(write!(f, "{}\n", self.dib_header));
-        write!(f, "Padding: {}\n", self.padding)
-    }
-}
-
 #[derive(Copy)]
 pub struct ImageIndex {
-    width: uint,
-    height: uint,
-    x: uint,
-    y: uint
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize
 }
 
 impl ImageIndex {
-    fn new(width: uint, height: uint) -> ImageIndex {
+    fn new(width: usize, height: usize) -> ImageIndex {
         ImageIndex {
             width: width,
             height: height,
@@ -336,9 +326,9 @@ impl ImageIndex {
 }
 
 impl Iterator for ImageIndex {
-    type Item = (uint, uint);
+    type Item = (usize, usize);
 
-    fn next(&mut self) -> Option<(uint, uint)> {
+    fn next(&mut self) -> Option<(usize, usize)> {
         if self.x < self.width && self.y < self.height {
             let this = Some((self.x, self.y));
             self.x += 1;
