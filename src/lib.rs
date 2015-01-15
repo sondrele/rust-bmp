@@ -1,3 +1,7 @@
+#![crate_type = "lib"]
+#![deny(warnings)]
+#![allow(unstable)]
+
 use std::num::Float;
 use std::iter::Iterator;
 use std::io::{BufferedStream, File, Open, Read, IoResult,
@@ -347,7 +351,6 @@ impl Iterator for ImageIndex {
 mod tests {
     extern crate test;
 
-    use self::test::Bencher;
     use std::mem::size_of;
     use std::io::{File, SeekSet};
     use std::io::fs::PathExtensions;
@@ -477,7 +480,7 @@ mod tests {
     }
 
     #[bench]
-    fn write_10x10_bmp(b: &mut Bencher) {
+    fn write_10x10_bmp(b: &mut test::Bencher) {
         let img = Image::new(10, 10);
         b.iter(|| img.save("src/test/bench_test.bmp"));
     }
