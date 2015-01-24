@@ -236,7 +236,7 @@ impl Image {
         let mut stream = BufferedStream::new(file);
 
         let padding_data: [u8; 4] = [0; 4];
-        let padding = padding_data.slice(0, self.padding as usize);
+        let padding = &padding_data[0 .. self.padding as usize];
         for y in (0 .. self.height) {
             for x in (0 .. self.width) {
                 let index = (y * self.width + x) as usize;
