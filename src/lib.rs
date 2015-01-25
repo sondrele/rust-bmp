@@ -90,51 +90,51 @@ pub struct Image {
     magic: BmpId,
     header: BmpHeader,
     dib_header: BmpDibHeader,
-    width: i32,
-    height: i32,
-    padding: i32,
+    width: u32,
+    height: u32,
+    padding: u32,
     data: Vec<Pixel>
 }
 
 impl Image {
-    pub fn new(width: usize, height: usize) -> Image {
-        let mut data = Vec::with_capacity(width * height);
+    pub fn new(width: u32, height: u32) -> Image {
+        let mut data = Vec::with_capacity((width * height) as usize);
         for _ in (0 .. width * height) {
             data.push(Pixel {r: 0, g: 0, b: 0});
         }
 
         let padding = width % 4;
         let header_size = 54;
-        let data_size = (width * height * 3 + height * padding) as u32;
+        let data_size = width * height * 3 + height * padding;
         Image {
             magic: BmpId::new(),
             header: BmpHeader::new(header_size, data_size),
             dib_header: BmpDibHeader::new(width as i32, height as i32),
-            width: width as i32,
-            height: height as i32,
-            padding: padding as i32,
+            width: width,
+            height: height,
+            padding: padding,
             data: data
         }
     }
 
-    pub fn get_width(&self) -> usize {
-        self.width as usize
+    pub fn get_width(&self) -> u32 {
+        self.width
     }
 
-    pub fn get_height(&self) -> usize {
-        self.height as usize
+    pub fn get_height(&self) -> u32 {
+        self.height
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, val: Pixel) {
-        self.data[(self.height as usize - y - 1) * (self.width as usize) + x] = val;
+    pub fn set_pixel(&mut self, x: u32, y: u32, val: Pixel) {
+        self.data[((self.height - y - 1) * self.width + x) as usize] = val;
     }
 
-    pub fn get_pixel(&self, x: usize, y: usize) -> Pixel {
-        self.data[(self.height as usize - y - 1) * (self.width as usize) + x]
+    pub fn get_pixel(&self, x: u32, y: u32) -> Pixel {
+        self.data[((self.height - y - 1) * self.width + x) as usize]
     }
 
     pub fn coordinates(&self) -> ImageIndex {
-        ImageIndex::new(self.width as usize, self.height as usize)
+        ImageIndex::new(self.width as u32, self.height as u32)
     }
 
     pub fn open(name: &str) -> Image {
@@ -175,9 +175,9 @@ impl Image {
             magic: id,
             header: header,
             dib_header: dib_header,
-            width: width,
-            height: height,
-            padding: padding,
+            width: width as u32,
+            height: height as u32,
+            padding: padding as u32,
             data: data
         }
     }
@@ -303,14 +303,14 @@ impl Image {
 
 #[derive(Copy)]
 pub struct ImageIndex {
-    width: usize,
-    height: usize,
-    x: usize,
-    y: usize
+    width: u32,
+    height: u32,
+    x: u32,
+    y: u32
 }
 
 impl ImageIndex {
-    fn new(width: usize, height: usize) -> ImageIndex {
+    fn new(width: u32, height: u32) -> ImageIndex {
         ImageIndex {
             width: width,
             height: height,
@@ -321,9 +321,9 @@ impl ImageIndex {
 }
 
 impl Iterator for ImageIndex {
-    type Item = (usize, usize);
+    type Item = (u32, u32);
 
-    fn next(&mut self) -> Option<(usize, usize)> {
+    fn next(&mut self) -> Option<(u32, u32)> {
         if self.x < self.width && self.y < self.height {
             let this = Some((self.x, self.y));
             self.x += 1;
