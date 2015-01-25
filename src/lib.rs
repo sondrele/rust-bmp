@@ -126,19 +126,11 @@ impl Image {
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, val: Pixel) {
-        if x < self.width as usize && y < self.height as usize {
-            self.data[y * (self.width as usize) + x] = val;
-        } else {
-            panic!("Index out of bounds: ({}, {})", x, y);
-        }
+        self.data[(self.height as usize - y - 1) * (self.width as usize) + x] = val;
     }
 
     pub fn get_pixel(&self, x: usize, y: usize) -> Pixel {
-        if x < self.width as usize && y < self.height as usize {
-            self.data[y * (self.width as usize) + x]
-        } else {
-            panic!("Index out of bounds: ({}, {})", x, y);
-        }
+        self.data[(self.height as usize - y - 1) * (self.width as usize) + x]
     }
 
     pub fn coordinates(&self) -> ImageIndex {
@@ -235,8 +227,7 @@ impl Image {
     fn write_data(&self, file: File) -> IoResult<()> {
         let mut stream = BufferedStream::new(file);
 
-        let padding_data: [u8; 4] = [0; 4];
-        let padding = &padding_data[0 .. self.padding as usize];
+        let padding: &[u8] = &[0; 4][0 .. self.padding as usize];
         for y in (0 .. self.height) {
             for x in (0 .. self.width) {
                 let index = (y * self.width + x) as usize;
@@ -286,7 +277,7 @@ impl Image {
             * 4 * dh.height as u32;
 
         if data_size == dh.data_size {
-            let mut data = Vec::new();
+            let mut data = Vec::with_capacity(dh.data_size as usize);
             // seek until data
             try!(f.seek(offset as i64, SeekSet));
             // read pixels until padding
@@ -433,26 +424,26 @@ mod tests {
         let bmp_img = Image::open("src/test/rgbw.bmp");
         assert_eq!(bmp_img.data.len(), 4);
 
-        assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
-        assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
-        assert_eq!(bmp_img.get_pixel(0, 1), RED);
-        assert_eq!(bmp_img.get_pixel(1, 1), LIME);
+        assert_eq!(bmp_img.get_pixel(0, 0), RED);
+        assert_eq!(bmp_img.get_pixel(1, 0), LIME);
+        assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 1), WHITE);
     }
 
     #[test]
     fn can_create_bmp_file() {
         let mut bmp = Image::new(2, 2);
-        bmp.set_pixel(0, 0, BLUE);
-        bmp.set_pixel(1, 0, WHITE);
-        bmp.set_pixel(0, 1, RED);
-        bmp.set_pixel(1, 1, LIME);
+        bmp.set_pixel(0, 0, RED);
+        bmp.set_pixel(1, 0, LIME);
+        bmp.set_pixel(0, 1, BLUE);
+        bmp.set_pixel(1, 1, WHITE);
         bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = Image::open("src/test/rgbw_test.bmp");
-        assert_eq!(bmp_img.get_pixel(0, 0), BLUE);
-        assert_eq!(bmp_img.get_pixel(1, 0), WHITE);
-        assert_eq!(bmp_img.get_pixel(0, 1), RED);
-        assert_eq!(bmp_img.get_pixel(1, 1), LIME);
+        assert_eq!(bmp_img.get_pixel(0, 0), RED);
+        assert_eq!(bmp_img.get_pixel(1, 0), LIME);
+        assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
+        assert_eq!(bmp_img.get_pixel(1, 1), WHITE);
 
         verify_test_bmp_image(bmp_img);
     }
