@@ -4,7 +4,7 @@
 
 use std::num::Float;
 use std::iter::Iterator;
-use std::io::{BufferedStream, File, Open, Read, IoResult,
+use std::old_io::{BufferedStream, File, Open, Read, IoResult,
     SeekSet, SeekCur};
 
 #[derive(Show, PartialEq, Copy)]
@@ -201,7 +201,7 @@ impl Image {
 
     fn write_header(&self, f: &mut File) -> IoResult<()> {
         let id = &self.magic;
-        try!(f.write(&[id.magic1, id.magic2]));
+        try!(f.write_all(&[id.magic1, id.magic2]));
 
         let header = &self.header;
         try!(f.write_le_u32(header.file_size));
@@ -232,9 +232,9 @@ impl Image {
             for x in (0 .. self.width) {
                 let index = (y * self.width + x) as usize;
                 let px = &self.data[index];
-                try!(stream.write(&[px.b, px.g, px.r]));
+                try!(stream.write_all(&[px.b, px.g, px.r]));
             }
-            try!(stream.write(padding));
+            try!(stream.write_all(padding));
         }
         Ok(())
     }
@@ -343,8 +343,8 @@ mod tests {
     extern crate test;
 
     use std::mem::size_of;
-    use std::io::{File, SeekSet};
-    use std::io::fs::PathExtensions;
+    use std::old_io::{File, SeekSet};
+    use std::old_io::fs::PathExtensions;
 
     use {BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
     use consts::{RED, LIME, BLUE, WHITE};
