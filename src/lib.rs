@@ -1,6 +1,6 @@
 #![crate_type = "lib"]
 #![deny(warnings)]
-#![allow(unstable)]
+#![feature(core, io, path)]
 
 use std::num::Float;
 use std::iter::Iterator;
@@ -341,6 +341,7 @@ impl Iterator for ImageIndex {
 #[cfg(test)]
 mod tests {
     extern crate test;
+
 
     use std::mem::size_of;
     use std::old_io::{File, SeekSet};
