@@ -7,6 +7,14 @@ Currently only 24-bit RGB BMP images are supported.
 
 Usage
 -----
+The library should be available on [crates.io](https://crates.io/crates/bmp),
+but updated versions of the crate might lag behind until 1.0.0 of Rust has been released.
+
+To ensure that the crate is up to date, add it as a git dependency to `Cargo.toml` in your project.
+```toml
+[dependencies.bmp]
+git = "https://github.com/sondrele/rust-bmp"
+```
 Initialize a new image with the `new` function, by specifying `width` and `height`.
 ```rust
 extern crate bmp;
