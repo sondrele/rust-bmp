@@ -215,21 +215,12 @@ impl Image {
         Ok(image)
     }
 
-    pub fn save(&self, name: &str) {
-        let mut f = match File::create(&Path::new(name)) {
-            Ok(f) => f,
-            Err(e) => panic!("File error: {}", e)
-        };
+    pub fn save(&self, name: &str) -> IoResult<()> {
+        let mut f = try!(File::create(&Path::new(name)));
 
-        match self.write_header(&mut f) {
-            Ok(_) => (),
-            Err(e) => panic!("File error: {}", e)
-        }
-
-        match self.write_data(f) {
-            Ok(_) => (),
-            Err(e) => panic!("File error: {}", e)
-        }
+        try!(self.write_header(&mut f));
+        try!(self.write_data(f));
+        Ok(())
     }
 
     fn write_header(&self, f: &mut File) -> IoResult<()> {
@@ -511,7 +502,7 @@ mod tests {
         bmp.set_pixel(1, 0, LIME);
         bmp.set_pixel(0, 1, BLUE);
         bmp.set_pixel(1, 1, WHITE);
-        bmp.save("src/test/rgbw_test.bmp");
+        let _ = bmp.save("src/test/rgbw_test.bmp");
 
         let bmp_img = Image::open("src/test/rgbw_test.bmp").unwrap();
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
