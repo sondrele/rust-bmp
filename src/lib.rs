@@ -2,10 +2,14 @@
 #![deny(warnings)]
 #![feature(core, io, path)]
 
+use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
-use std::old_io::{BufferedStream, File, Open, Read, IoResult,
-    SeekSet, SeekCur};
+use std::old_io::{BufferedStream, File, IoResult, IoError, Open, Read, SeekSet, SeekCur};
+use std::error::{Error, FromError};
+
+const B: u8 = 66;
+const M: u8 = 77;
 
 #[derive(Debug, PartialEq, Copy)]
 pub struct Pixel {
@@ -16,6 +20,40 @@ pub struct Pixel {
 
 pub mod consts;
 
+pub type BmpResult<T> = Result<T, BmpError>;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BmpError {
+    WrongMagicNumbers(String),
+    UnsupportedBitsPerPixel(String),
+    IncorrectDataSize(String),
+    IoError(std::old_io::IoError)
+}
+
+impl fmt::Display for BmpError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BmpError::WrongMagicNumbers(ref detail) =>
+                write!(fmt, "Wrong magic numbers: {}", detail),
+            BmpError::UnsupportedBitsPerPixel(ref detail) =>
+                write!(fmt, "Unsupported bits per pixel: {}", detail),
+            BmpError::IncorrectDataSize(ref detail) =>
+                write!(fmt, "Incorrect size of image data: {}", detail),
+            BmpError::IoError(ref error) => error.fmt(fmt)
+        }
+    }
+}
+
+impl FromError<IoError> for BmpError {
+    fn from_error(err: IoError) -> BmpError {
+        BmpError::IoError(err)
+    }
+}
+
+impl Error for BmpError {
+    fn description(&self) -> &str { "BMP image error" }
+}
+
 #[derive(Debug)]
 struct BmpId {
     magic1: u8,
@@ -25,8 +63,8 @@ struct BmpId {
 impl BmpId {
     pub fn new() -> BmpId {
         BmpId {
-            magic1: 0x42 /* 'B' */,
-            magic2: 0x4D /* 'M' */
+            magic1: B,
+            magic2: M
         }
     }
 }
@@ -96,8 +134,8 @@ pub struct Image {
     data: Vec<Pixel>
 }
 
-impl std::fmt::Debug for Image {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl fmt::Debug for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Image {}\n", '{'));
         try!(write!(f, "\tmagic: {:?},\n", self.magic));
         try!(write!(f, "\theader: {:?},\n", self.header));
@@ -149,41 +187,22 @@ impl Image {
         ImageIndex::new(self.width as u32, self.height as u32)
     }
 
-    pub fn open(name: &str) -> Image {
-        let mut f = match File::open_mode(&Path::new(name), Open, Read) {
-            Ok(f) => f,
-            Err(e) => panic!("File error: {}", e),
-        };
+    pub fn open(name: &str) -> BmpResult<Image> {
+        let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
 
-        let id = match Image::read_bmp_id(&mut f) {
-            Ok(id) => id,
-            Err(e) => panic!("File is not a bitmap: {}", e)
-        };
-        assert_eq!(id.magic1, 0x42);
-        assert_eq!(id.magic2, 0x4D);
-
-        let header = match Image::read_bmp_header(&mut f) {
-            Ok(header) => header,
-            Err(e) => panic!("Header of bitmap is not valid: {}", e)
-        };
-
-        let dib_header = match Image::read_bmp_dib_header(&mut f) {
-            Ok(dib_header) => dib_header,
-            Err(e) => panic!("DIB header of bitmap is not valid: {}", e)
-        };
+        let id = try!(Image::read_bmp_id(&mut f));
+        let header = try!(Image::read_bmp_header(&mut f));
+        let dib_header = try!(Image::read_bmp_dib_header(&mut f));
 
         let padding = dib_header.width % 4;
-        let data = match Image::read_image_data(&mut f, &dib_header,
+        let data = try!(Image::read_image_data(&mut f, &dib_header,
                                                 header.pixel_offset,
-                                                padding as i64) {
-            Ok(data) => data,
-            Err(e) => panic!("Data of bitmap is not valid: {}", e)
-        };
+                                                padding as i64));
 
         let width = dib_header.width;
         let height = dib_header.height;
 
-        Image {
+        let image = Image {
             magic: id,
             header: header,
             dib_header: dib_header,
@@ -191,7 +210,9 @@ impl Image {
             height: height as u32,
             padding: padding as u32,
             data: data
-        }
+        };
+
+        Ok(image)
     }
 
     pub fn save(&self, name: &str) {
@@ -251,24 +272,30 @@ impl Image {
         Ok(())
     }
 
-    fn read_bmp_id(f: &mut File) -> IoResult<BmpId> {
-        Ok(BmpId {
-            magic1: try!(f.read_byte()),
-            magic2: try!(f.read_byte())
-        })
+    fn read_bmp_id(f: &mut File) -> BmpResult<BmpId> {
+        let (m1, m2) = (try!(f.read_byte()), try!(f.read_byte()));
+
+        match (m1, m2) {
+            (m1, m2) if m1 != B || m2 != M =>
+                Err(BmpError::WrongMagicNumbers(
+                    format!("Expected '66 77', but was '{} {}'", m1, m2))),
+            (m1, m2) => Ok(BmpId { magic1: m1, magic2: m2 })
+        }
     }
 
-    fn read_bmp_header(f: &mut File) -> IoResult<BmpHeader> {
-        Ok(BmpHeader {
+    fn read_bmp_header(f: &mut File) -> BmpResult<BmpHeader> {
+        let header = BmpHeader {
             file_size: try!(f.read_le_u32()),
             creator1: try!(f.read_le_u16()),
             creator2: try!(f.read_le_u16()),
             pixel_offset: try!(f.read_le_u32())
-        })
+        };
+
+        Ok(header)
     }
 
-    fn read_bmp_dib_header(f: &mut File) -> IoResult<BmpDibHeader> {
-        Ok(BmpDibHeader {
+    fn read_bmp_dib_header(f: &mut File) -> BmpResult<BmpDibHeader> {
+        let dib_header = BmpDibHeader {
             header_size: try!(f.read_le_u32()),
             width: try!(f.read_le_i32()),
             height: try!(f.read_le_i32()),
@@ -280,36 +307,42 @@ impl Image {
             vres: try!(f.read_le_i32()),
             num_colors: try!(f.read_le_u32()),
             num_imp_colors: try!(f.read_le_u32()),
-        })
+        };
+
+        if dib_header.bits_per_pixel != 24 {
+            return Err(BmpError::UnsupportedBitsPerPixel(
+                format!("Expected 24, but was {}", dib_header.bits_per_pixel)));
+        }
+
+        let row_size = ((24.0 * dib_header.width as f32 + 31.0) / 32.0).floor() as u32 * 4;
+        let pixel_array_size = row_size * dib_header.height as u32;
+        if pixel_array_size != dib_header.data_size {
+            return Err(BmpError::IncorrectDataSize(
+                format!("Expected {}, but was {}", pixel_array_size, dib_header.data_size)))
+        }
+
+        Ok(dib_header)
     }
 
     fn read_image_data(f: &mut File, dh: &BmpDibHeader, offset: u32, padding: i64) ->
-    IoResult<Vec<Pixel>> {
-        let data_size = ((24.0 * dh.width as f32 + 31.0) / 32.0).floor() as u32
-            * 4 * dh.height as u32;
-
-        if data_size == dh.data_size {
-            let mut data = Vec::with_capacity(dh.data_size as usize);
-            // seek until data
-            try!(f.seek(offset as i64, SeekSet));
-            // read pixels until padding
-            for _ in (0 .. dh.height) {
-                for _ in (0 .. dh.width) {
-                    let [b, g, r] = [
-                        try!(f.read_byte()),
-                        try!(f.read_byte()),
-                        try!(f.read_byte())
-                    ];
-                    data.push(Pixel {r: r, g: g, b: b});
-                }
-                // seek padding
-                try!(f.seek(padding, SeekCur));
+                       BmpResult<Vec<Pixel>> {
+        let mut data = Vec::with_capacity(dh.data_size as usize);
+        // seek until data
+        try!(f.seek(offset as i64, SeekSet));
+        // read pixels until padding
+        for _ in (0 .. dh.height) {
+            for _ in (0 .. dh.width) {
+                let [b, g, r] = [
+                    try!(f.read_byte()),
+                    try!(f.read_byte()),
+                    try!(f.read_byte())
+                ];
+                data.push(Pixel {r: r, g: g, b: b});
             }
-            Ok(data)
-        } else {
-            panic!("data_size for image does not match data_size for BmpDibHeader, {} != {}",
-                data_size, dh.data_size)
+            // seek padding
+            try!(f.seek(padding, SeekCur));
         }
+        Ok(data)
     }
 }
 
@@ -354,12 +387,11 @@ impl Iterator for ImageIndex {
 mod tests {
     extern crate test;
 
-
     use std::mem::size_of;
     use std::old_io::{File, SeekSet};
     use std::old_io::fs::PathExtensions;
 
-    use {BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
+    use {B, M, BmpError, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
     use consts::{RED, LIME, BLUE, WHITE};
 
     #[test]
@@ -407,18 +439,18 @@ mod tests {
 
     #[test]
     fn can_read_bmp_image() {
-        let bmp_img = Image::open("src/test/rgbw.bmp");
+        let bmp_img = Image::open("src/test/rgbw.bmp").unwrap();
         verify_test_bmp_image(bmp_img);
     }
 
     #[test]
     fn can_read_image_data() {
-        let mut f = match File::open(&Path::new("src/test/rgbw.bmp"), ) {
+        let mut f = match File::open(&Path::new("src/test/rgbw.bmp")) {
             Ok(file) => file,
             Err(e) => panic!("File error: {}", e)
         };
-        assert_eq!(0x42, f.read_byte().unwrap());
-        assert_eq!(0x4D, f.read_byte().unwrap());
+        assert_eq!(B, f.read_byte().unwrap());
+        assert_eq!(M, f.read_byte().unwrap());
 
         match f.seek(54, SeekSet) {
             Ok(_) => (),
@@ -436,13 +468,40 @@ mod tests {
 
     #[test]
     fn can_read_entire_bmp_image() {
-        let bmp_img = Image::open("src/test/rgbw.bmp");
+        let bmp_img = Image::open("src/test/rgbw.bmp").unwrap();
         assert_eq!(bmp_img.data.len(), 4);
 
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
         assert_eq!(bmp_img.get_pixel(1, 0), LIME);
         assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
         assert_eq!(bmp_img.get_pixel(1, 1), WHITE);
+    }
+
+    #[test]
+    fn error_when_opening_unexisting_image() {
+        let result = Image::open("test/no_img.bmp");
+        match result {
+            Err(BmpError::IoError(_)) => (/* Expected */),
+            _ => panic!("Ghost image!?")
+        }
+    }
+
+    #[test]
+    fn error_when_opening_image_with_wrong_bits_per_pixel() {
+        let result = Image::open("test/bmptestsuite-0.9/valid/1bpp-1x1.bmp");
+        match result {
+            Err(BmpError::UnsupportedBitsPerPixel(_)) => (/* Expected */),
+            _ => panic!("1bpp should not be supported")
+        }
+    }
+
+    #[test]
+    fn error_when_opening_image_with_wrong_magic_numbers() {
+        let result = Image::open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
+        match result {
+            Err(BmpError::WrongMagicNumbers(_)) => (/* Expected */),
+            _ => panic!("Wrong magic numbers should not be supported")
+        }
     }
 
     #[test]
@@ -454,7 +513,7 @@ mod tests {
         bmp.set_pixel(1, 1, WHITE);
         bmp.save("src/test/rgbw_test.bmp");
 
-        let bmp_img = Image::open("src/test/rgbw_test.bmp");
+        let bmp_img = Image::open("src/test/rgbw_test.bmp").unwrap();
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
         assert_eq!(bmp_img.get_pixel(1, 0), LIME);
         assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
