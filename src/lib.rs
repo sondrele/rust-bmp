@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn size_of_4pixel_bmp_image_is_70_bytes() {
-        let path_wd = Path::new("src/test/rgbw.bmp");
+        let path_wd = Path::new("test/rgbw.bmp");
         match path_wd.lstat() {
             Ok(stat) => assert_eq!(70, stat.size as i32),
             Err(_) => (/* Ignore IoError for now */)
@@ -430,13 +430,13 @@ mod tests {
 
     #[test]
     fn can_read_bmp_image() {
-        let bmp_img = Image::open("src/test/rgbw.bmp").unwrap();
+        let bmp_img = Image::open("test/rgbw.bmp").unwrap();
         verify_test_bmp_image(bmp_img);
     }
 
     #[test]
     fn can_read_image_data() {
-        let mut f = match File::open(&Path::new("src/test/rgbw.bmp")) {
+        let mut f = match File::open(&Path::new("test/rgbw.bmp")) {
             Ok(file) => file,
             Err(e) => panic!("File error: {}", e)
         };
@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn can_read_entire_bmp_image() {
-        let bmp_img = Image::open("src/test/rgbw.bmp").unwrap();
+        let bmp_img = Image::open("test/rgbw.bmp").unwrap();
         assert_eq!(bmp_img.data.len(), 4);
 
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
@@ -502,9 +502,9 @@ mod tests {
         bmp.set_pixel(1, 0, LIME);
         bmp.set_pixel(0, 1, BLUE);
         bmp.set_pixel(1, 1, WHITE);
-        let _ = bmp.save("src/test/rgbw_test.bmp");
+        let _ = bmp.save("test/rgbw_test.bmp");
 
-        let bmp_img = Image::open("src/test/rgbw_test.bmp").unwrap();
+        let bmp_img = Image::open("test/rgbw_test.bmp").unwrap();
         assert_eq!(bmp_img.get_pixel(0, 0), RED);
         assert_eq!(bmp_img.get_pixel(1, 0), LIME);
         assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
@@ -538,6 +538,6 @@ mod tests {
     #[bench]
     fn write_10x10_bmp(b: &mut test::Bencher) {
         let img = Image::new(10, 10);
-        b.iter(|| img.save("src/test/bench_test.bmp"));
+        b.iter(|| img.save("test/bench_test.bmp"));
     }
 }
