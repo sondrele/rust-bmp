@@ -11,7 +11,7 @@ use std::error::{Error, FromError};
 const B: u8 = 66;
 const M: u8 = 77;
 
-#[derive(Debug, PartialEq, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Pixel {
     pub r: u8,
     pub g: u8,
@@ -54,7 +54,7 @@ impl Error for BmpError {
     fn description(&self) -> &str { "BMP image error" }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct BmpId {
     magic1: u8,
     magic2: u8
@@ -69,7 +69,7 @@ impl BmpId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct BmpHeader {
     file_size: u32,
     creator1: u16,
@@ -88,7 +88,7 @@ impl BmpHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct BmpDibHeader {
     header_size: u32,
     width: i32,
@@ -124,6 +124,7 @@ impl BmpDibHeader {
     }
 }
 
+#[derive(Clone, Eq, PartialEq)]
 pub struct Image {
     magic: BmpId,
     header: BmpHeader,
