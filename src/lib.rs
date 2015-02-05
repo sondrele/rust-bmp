@@ -78,8 +78,8 @@ impl BmpDibHeader {
             bits_per_pixel: 24,
             compress_type: 0,
             data_size: pixel_array_size,
-            hres: 0x100,
-            vres: 0x100,
+            hres: 1000,
+            vres: 1000,
             num_colors: 0,
             num_imp_colors: 0
         }
@@ -94,6 +94,18 @@ pub struct Image {
     height: u32,
     padding: u32,
     data: Vec<Pixel>
+}
+
+impl std::fmt::Debug for Image {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        try!(write!(f, "Image {}\n", '{'));
+        try!(write!(f, "\tmagic: {:?},\n", self.magic));
+        try!(write!(f, "\theader: {:?},\n", self.header));
+        try!(write!(f, "\tdib_header: {:?},\n", self.dib_header));
+        try!(write!(f, "\twidth: {:?},\n", self.width));
+        try!(write!(f, "\theight: {:?},\n", self.height));
+        write!(f, "{}", '}')
+    }
 }
 
 impl Image {
@@ -385,8 +397,8 @@ mod tests {
         assert_eq!(24,    dib_header.bits_per_pixel);
         assert_eq!(0,     dib_header.compress_type);
         assert_eq!(16,    dib_header.data_size);
-        assert_eq!(0x100, dib_header.hres);
-        assert_eq!(0x100, dib_header.vres);
+        assert_eq!(1000, dib_header.hres);
+        assert_eq!(1000, dib_header.vres);
         assert_eq!(0,     dib_header.num_colors);
         assert_eq!(0,     dib_header.num_imp_colors);
 
