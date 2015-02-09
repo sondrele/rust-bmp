@@ -5,7 +5,7 @@
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
-use std::old_io::{File, IoResult, IoError, MemWriter, Open, Read, SeekSet, SeekCur};
+use std::old_io::{File, IoResult, IoError, MemReader, MemWriter, Open, Read, SeekSet, SeekCur};
 use std::error::{Error, FromError};
 
 const B: u8 = 66;
@@ -190,13 +190,14 @@ impl Image {
 
     pub fn open(name: &str) -> BmpResult<Image> {
         let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
+        let mut bmp_data = MemReader::new(try!(f.read_to_end()));
 
-        let id = try!(Image::read_bmp_id(&mut f));
-        let header = try!(Image::read_bmp_header(&mut f));
-        let dib_header = try!(Image::read_bmp_dib_header(&mut f));
+        let id = try!(Image::read_bmp_id(&mut bmp_data));
+        let header = try!(Image::read_bmp_header(&mut bmp_data));
+        let dib_header = try!(Image::read_bmp_dib_header(&mut bmp_data));
 
         let padding = dib_header.width % 4;
-        let data = try!(Image::read_image_data(&mut f, &dib_header,
+        let data = try!(Image::read_image_data(&mut bmp_data, &dib_header,
                                                 header.pixel_offset,
                                                 padding as i64));
 
@@ -264,8 +265,8 @@ impl Image {
         Ok(())
     }
 
-    fn read_bmp_id(f: &mut File) -> BmpResult<BmpId> {
-        let (m1, m2) = (try!(f.read_byte()), try!(f.read_byte()));
+    fn read_bmp_id(bmp_data: &mut MemReader) -> BmpResult<BmpId> {
+        let (m1, m2) = (try!(bmp_data.read_byte()), try!(bmp_data.read_byte()));
 
         match (m1, m2) {
             (m1, m2) if m1 != B || m2 != M =>
@@ -275,30 +276,30 @@ impl Image {
         }
     }
 
-    fn read_bmp_header(f: &mut File) -> BmpResult<BmpHeader> {
+    fn read_bmp_header(bmp_data: &mut MemReader) -> BmpResult<BmpHeader> {
         let header = BmpHeader {
-            file_size: try!(f.read_le_u32()),
-            creator1: try!(f.read_le_u16()),
-            creator2: try!(f.read_le_u16()),
-            pixel_offset: try!(f.read_le_u32())
+            file_size:    try!(bmp_data.read_le_u32()),
+            creator1:     try!(bmp_data.read_le_u16()),
+            creator2:     try!(bmp_data.read_le_u16()),
+            pixel_offset: try!(bmp_data.read_le_u32())
         };
 
         Ok(header)
     }
 
-    fn read_bmp_dib_header(f: &mut File) -> BmpResult<BmpDibHeader> {
+    fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
         let dib_header = BmpDibHeader {
-            header_size: try!(f.read_le_u32()),
-            width: try!(f.read_le_i32()),
-            height: try!(f.read_le_i32()),
-            num_planes: try!(f.read_le_u16()),
-            bits_per_pixel: try!(f.read_le_u16()),
-            compress_type: try!(f.read_le_u32()),
-            data_size: try!(f.read_le_u32()),
-            hres: try!(f.read_le_i32()),
-            vres: try!(f.read_le_i32()),
-            num_colors: try!(f.read_le_u32()),
-            num_imp_colors: try!(f.read_le_u32()),
+            header_size:    try!(bmp_data.read_le_u32()),
+            width:          try!(bmp_data.read_le_i32()),
+            height:         try!(bmp_data.read_le_i32()),
+            num_planes:     try!(bmp_data.read_le_u16()),
+            bits_per_pixel: try!(bmp_data.read_le_u16()),
+            compress_type:  try!(bmp_data.read_le_u32()),
+            data_size:      try!(bmp_data.read_le_u32()),
+            hres:           try!(bmp_data.read_le_i32()),
+            vres:           try!(bmp_data.read_le_i32()),
+            num_colors:     try!(bmp_data.read_le_u32()),
+            num_imp_colors: try!(bmp_data.read_le_u32()),
         };
 
         if dib_header.bits_per_pixel != 24 {
@@ -316,23 +317,23 @@ impl Image {
         Ok(dib_header)
     }
 
-    fn read_image_data(f: &mut File, dh: &BmpDibHeader, offset: u32, padding: i64) ->
+    fn read_image_data(bmp_data: &mut MemReader, dh: &BmpDibHeader, offset: u32, padding: i64) ->
                        BmpResult<Vec<Pixel>> {
         let mut data = Vec::with_capacity(dh.data_size as usize);
         // seek until data
-        try!(f.seek(offset as i64, SeekSet));
+        try!(bmp_data.seek(offset as i64, SeekSet));
         // read pixels until padding
         for _ in (0 .. dh.height) {
             for _ in (0 .. dh.width) {
                 let [b, g, r] = [
-                    try!(f.read_byte()),
-                    try!(f.read_byte()),
-                    try!(f.read_byte())
+                    try!(bmp_data.read_byte()),
+                    try!(bmp_data.read_byte()),
+                    try!(bmp_data.read_byte())
                 ];
                 data.push(Pixel {r: r, g: g, b: b});
             }
             // seek padding
-            try!(f.seek(padding, SeekCur));
+            try!(bmp_data.seek(padding, SeekCur));
         }
         Ok(data)
     }
@@ -537,8 +538,13 @@ mod tests {
     }
 
     #[bench]
-    fn write_10x10_bmp(b: &mut test::Bencher) {
-        let img = Image::new(10, 10);
+    fn write_bmp(b: &mut test::Bencher) {
+        let img = Image::new(320, 240);
         b.iter(|| img.save("test/bench_test.bmp"));
+    }
+
+    #[bench]
+    fn open_bmp(b: &mut test::Bencher) {
+        b.iter(|| Image::open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp"));
     }
 }
