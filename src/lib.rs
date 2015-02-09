@@ -5,7 +5,7 @@
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
-use std::old_io::{BufferedStream, File, IoResult, IoError, Open, Read, SeekSet, SeekCur};
+use std::old_io::{File, IoResult, IoError, MemWriter, Open, Read, SeekSet, SeekCur};
 use std::error::{Error, FromError};
 
 const B: u8 = 66;
@@ -217,49 +217,49 @@ impl Image {
     }
 
     pub fn save(&self, name: &str) -> IoResult<()> {
-        let mut f = try!(File::create(&Path::new(name)));
+        let mut bmp_data = MemWriter::with_capacity(self.header.file_size as usize);
+        try!(self.write_header(&mut bmp_data));
+        try!(self.write_data(&mut bmp_data));
 
-        try!(self.write_header(&mut f));
-        try!(self.write_data(f));
+        let mut bmp_file = try!(File::create(&Path::new(name)));
+        try!(bmp_file.write_all(bmp_data.get_ref()));
         Ok(())
     }
 
-    fn write_header(&self, f: &mut File) -> IoResult<()> {
+    fn write_header(&self, bmp_data: &mut MemWriter) -> IoResult<()> {
         let id = &self.magic;
-        try!(f.write_all(&[id.magic1, id.magic2]));
+        try!(bmp_data.write_all(&[id.magic1, id.magic2]));
 
         let header = &self.header;
-        try!(f.write_le_u32(header.file_size));
-        try!(f.write_le_u16(header.creator1));
-        try!(f.write_le_u16(header.creator2));
-        try!(f.write_le_u32(header.pixel_offset));
+        try!(bmp_data.write_le_u32(header.file_size));
+        try!(bmp_data.write_le_u16(header.creator1));
+        try!(bmp_data.write_le_u16(header.creator2));
+        try!(bmp_data.write_le_u32(header.pixel_offset));
 
         let dib_header = &self.dib_header;
-        try!(f.write_le_u32(dib_header.header_size));
-        try!(f.write_le_i32(dib_header.width));
-        try!(f.write_le_i32(dib_header.height));
-        try!(f.write_le_u16(dib_header.num_planes));
-        try!(f.write_le_u16(dib_header.bits_per_pixel));
-        try!(f.write_le_u32(dib_header.compress_type));
-        try!(f.write_le_u32(dib_header.data_size));
-        try!(f.write_le_i32(dib_header.hres));
-        try!(f.write_le_i32(dib_header.vres));
-        try!(f.write_le_u32(dib_header.num_colors));
-        try!(f.write_le_u32(dib_header.num_imp_colors));
+        try!(bmp_data.write_le_u32(dib_header.header_size));
+        try!(bmp_data.write_le_i32(dib_header.width));
+        try!(bmp_data.write_le_i32(dib_header.height));
+        try!(bmp_data.write_le_u16(dib_header.num_planes));
+        try!(bmp_data.write_le_u16(dib_header.bits_per_pixel));
+        try!(bmp_data.write_le_u32(dib_header.compress_type));
+        try!(bmp_data.write_le_u32(dib_header.data_size));
+        try!(bmp_data.write_le_i32(dib_header.hres));
+        try!(bmp_data.write_le_i32(dib_header.vres));
+        try!(bmp_data.write_le_u32(dib_header.num_colors));
+        try!(bmp_data.write_le_u32(dib_header.num_imp_colors));
         Ok(())
     }
 
-    fn write_data(&self, file: File) -> IoResult<()> {
-        let mut stream = BufferedStream::new(file);
-
+    fn write_data(&self, bmp_data: &mut MemWriter) -> IoResult<()> {
         let padding: &[u8] = &[0; 4][0 .. self.padding as usize];
         for y in (0 .. self.height) {
             for x in (0 .. self.width) {
                 let index = (y * self.width + x) as usize;
                 let px = &self.data[index];
-                try!(stream.write_all(&[px.b, px.g, px.r]));
+                try!(bmp_data.write_all(&[px.b, px.g, px.r]));
             }
-            try!(stream.write_all(padding));
+            try!(bmp_data.write_all(padding));
         }
         Ok(())
     }
