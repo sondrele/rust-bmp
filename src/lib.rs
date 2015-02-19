@@ -1,11 +1,12 @@
 #![crate_type = "lib"]
 #![deny(warnings)]
-#![feature(core, io, path)]
+#![feature(core, io)]
 
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
 use std::old_io::{File, IoResult, IoError, MemReader, MemWriter, Open, Read, SeekSet, SeekCur};
+use std::old_path::Path;
 use std::error::{Error, FromError};
 
 const B: u8 = 66;
