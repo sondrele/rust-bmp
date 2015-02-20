@@ -2,6 +2,30 @@
 #![deny(warnings)]
 #![feature(core, io)]
 
+//! A small library for reading and writing 24-bit BMP images.
+//!
+//!# Example
+//!
+//!```
+//!extern crate bmp;
+//!
+//!use bmp::{Image, Pixel};
+//!
+//!fn main() {
+//!    let mut img = Image::new(256, 256);
+//!
+//!    for (x, y) in img.coordinates() {
+//!        img.set_pixel(x, y, Pixel {
+//!            r: (x - y / 256) as u8,
+//!            g: (y - x / 256) as u8,
+//!            b: (x + y / 256) as u8
+//!        })
+//!    }
+//!    let _ = img.save("img.bmp");
+//!}
+//!
+//!```
+
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
@@ -12,6 +36,9 @@ use std::error::{Error, FromError};
 const B: u8 = 66;
 const M: u8 = 77;
 
+/// The pixel data used in the `Image`
+///
+/// It has three values for the `red`, `blue` and `green` color channels, respectively.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Pixel {
     pub r: u8,
@@ -19,10 +46,13 @@ pub struct Pixel {
     pub b: u8
 }
 
+/// Common color constants accessible by names.
 pub mod consts;
 
+/// A result type, either containing an `Image` or a `BmpError`.
 pub type BmpResult<T> = Result<T, BmpError>;
 
+/// The error type returned if the decoding of an image from disk fails.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BmpError {
     WrongMagicNumbers(String),
@@ -125,6 +155,15 @@ impl BmpDibHeader {
     }
 }
 
+/// The image type provided by the library.
+///
+/// It exposes functions to initialize or read BMP images from disk, common modification of pixel
+/// data, and saving to disk.
+///
+/// The image is accessed in row-major order from top to bottom,
+/// where point (0, 0) is defined to be in the upper left corner of the image.
+///
+/// Currently, only 24-bit, uncompressed BMP images are supported.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Image {
     magic: BmpId,
@@ -149,6 +188,16 @@ impl fmt::Debug for Image {
 }
 
 impl Image {
+    /// Returns a new BMP Image with the `width` and `height` specified. It is initialized to
+    /// a black image by default.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let mut img = bmp::Image::new(100, 80);
+    /// ```
     pub fn new(width: u32, height: u32) -> Image {
         let mut data = Vec::with_capacity((width * height) as usize);
         for _ in (0 .. width * height) {
@@ -169,26 +218,78 @@ impl Image {
         }
     }
 
+    /// Returns the `width` of the Image
+    #[inline]
     pub fn get_width(&self) -> u32 {
         self.width
     }
 
+    /// Returns the `height` of the Image
+    #[inline]
     pub fn get_height(&self) -> u32 {
         self.height
     }
 
+    /// Set the pixel value at the position of `width` and `height`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let mut img = bmp::Image::new(100, 80);
+    /// img.set_pixel(10, 10, bmp::consts::RED);
+    /// ```
+    #[inline]
     pub fn set_pixel(&mut self, x: u32, y: u32, val: Pixel) {
         self.data[((self.height - y - 1) * self.width + x) as usize] = val;
     }
 
+    /// Returns the pixel value at the position of `width` and `height`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let img = bmp::Image::new(100, 80);
+    /// assert_eq!(bmp::consts::BLACK, img.get_pixel(10, 10));
+    /// ```
+    #[inline]
     pub fn get_pixel(&self, x: u32, y: u32) -> Pixel {
         self.data[((self.height - y - 1) * self.width + x) as usize]
     }
 
+    /// Returns a new `ImageIndex` that iterates over the image dimensions in top-bottom order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let mut img = bmp::Image::new(100, 100);
+    /// for (x, y) in img.coordinates() {
+    ///     img.set_pixel(x, y, bmp::consts::BLUE);
+    /// }
+    /// ```
+    #[inline]
     pub fn coordinates(&self) -> ImageIndex {
         ImageIndex::new(self.width as u32, self.height as u32)
     }
 
+    /// Returns a `BmpResult`, either containing an `Image` or a `BmpError`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let img = match bmp::Image::open("test/rgbw.bmp") {
+    ///     Ok(img) => img,
+    ///     Err(e) => panic!("Failed to open: {}", e)
+    /// };
+    ///
+    /// ```
     pub fn open(name: &str) -> BmpResult<Image> {
         let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
         let mut bmp_data = MemReader::new(try!(f.read_to_end()));
@@ -218,6 +319,22 @@ impl Image {
         Ok(image)
     }
 
+    /// Saves the image to the path specified by `name`. The function will overwrite the contents
+    /// if a file already exists with the same name.
+    ///
+    /// The function returns the `IoResult` returned from the underlying `Reader`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate bmp;
+    ///
+    /// let mut img = bmp::Image::new(100, 100);
+    /// match img.save("black.bmp") {
+    ///     Ok(_) => (/* Success */),
+    ///     Err(e) => panic!("Failed to save: {}", e)
+    /// }
+    /// ```
     pub fn save(&self, name: &str) -> IoResult<()> {
         let mut bmp_data = MemWriter::with_capacity(self.header.file_size as usize);
         try!(self.write_header(&mut bmp_data));
@@ -340,6 +457,9 @@ impl Image {
     }
 }
 
+/// An `Iterator` returning the `x` and `y` coordinates of an image.
+///
+/// It supports iteration over an image in row-major order, starting from in the upper left corner of the image.
 #[derive(Copy)]
 pub struct ImageIndex {
     width: u32,
