@@ -1,6 +1,7 @@
 #![crate_type = "lib"]
-#![deny(warnings)]
-#![feature(core, io)]
+#![allow(warnings)]
+#![feature(core, old_io, old_path)]
+#![cfg_attr(test, feature(test))]
 
 //! A small library for reading and writing 24-bit BMP images.
 //!
@@ -29,7 +30,7 @@
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
-use std::old_io::{File, IoResult, IoError, MemReader, MemWriter, Open, Read, SeekSet, SeekCur};
+use std::old_io::{File, IoResult, IoError, MemReader, Open, Read, SeekSet, SeekCur};
 use std::old_path::Path;
 use std::error::{Error, FromError};
 
@@ -57,6 +58,8 @@ pub type BmpResult<T> = Result<T, BmpError>;
 pub enum BmpError {
     WrongMagicNumbers(String),
     UnsupportedBitsPerPixel(String),
+    UnsupportedCompressionType,
+    UnsupportedBmpVersion(BmpVersion),
     IncorrectDataSize(String),
     IoError(std::old_io::IoError)
 }
@@ -64,12 +67,16 @@ pub enum BmpError {
 impl fmt::Display for BmpError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            BmpError::WrongMagicNumbers(ref detail) =>
-                write!(fmt, "Wrong magic numbers: {}", detail),
-            BmpError::UnsupportedBitsPerPixel(ref detail) =>
-                write!(fmt, "Unsupported bits per pixel: {}", detail),
-            BmpError::IncorrectDataSize(ref detail) =>
-                write!(fmt, "Incorrect size of image data: {}", detail),
+            BmpError::WrongMagicNumbers(ref details) =>
+                write!(fmt, "Wrong magic numbers: {}", details),
+            BmpError::UnsupportedBitsPerPixel(ref details) =>
+                write!(fmt, "Unsupported bits per pixel: {}", details),
+            BmpError::UnsupportedCompressionType =>
+                write!(fmt, "Unsupported compression type: RLE compression not supported"),
+            BmpError::UnsupportedBmpVersion(ref version) => 
+                write!(fmt, "Unsupported BMP version: {}", version),
+            BmpError::IncorrectDataSize(ref details) =>
+                write!(fmt, "Incorrect size of image data: {}", details),
             BmpError::IoError(ref error) => error.fmt(fmt)
         }
     }
@@ -83,6 +90,35 @@ impl FromError<IoError> for BmpError {
 
 impl Error for BmpError {
     fn description(&self) -> &str { "BMP image error" }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BmpVersion {
+    Version1,
+    Version2,
+    Version3,
+    Version3NT,
+    Version4,
+}
+
+impl fmt::Display for BmpVersion {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BmpVersion::Version1 => write!(fmt, "BMP Version 1"),
+            BmpVersion::Version2 => write!(fmt, "BMP Version 2"),
+            BmpVersion::Version3 => write!(fmt, "BMP Version 3"),
+            BmpVersion::Version3NT => write!(fmt, "BMP Version 3 NT"),
+            BmpVersion::Version4 => write!(fmt, "BMP Version 4")
+        }
+    }
+}
+
+enum CompressionType {
+    Uncompressed,
+    RLE_8bit,
+    RLE_4bit,
+    // Only for BMP version 4
+    BitfieldsEncoding, 
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -169,6 +205,7 @@ pub struct Image {
     magic: BmpId,
     header: BmpHeader,
     dib_header: BmpDibHeader,
+    color_palette: Option<Vec<Pixel>>,
     width: u32,
     height: u32,
     padding: u32,
@@ -211,6 +248,7 @@ impl Image {
             magic: BmpId::new(),
             header: BmpHeader::new(header_size, data_size),
             dib_header: BmpDibHeader::new(width as i32, height as i32),
+            color_palette: None,
             width: width,
             height: height,
             padding: padding,
@@ -298,6 +336,8 @@ impl Image {
         let header = try!(Image::read_bmp_header(&mut bmp_data));
         let dib_header = try!(Image::read_bmp_dib_header(&mut bmp_data));
 
+        let color_palette = try!(Image::read_color_palette(&mut bmp_data, &dib_header));
+
         let padding = dib_header.width % 4;
         let data = try!(Image::read_image_data(&mut bmp_data, &dib_header,
                                                 header.pixel_offset,
@@ -310,6 +350,7 @@ impl Image {
             magic: id,
             header: header,
             dib_header: dib_header,
+            color_palette: color_palette,
             width: width as u32,
             height: height as u32,
             padding: padding as u32,
@@ -336,16 +377,16 @@ impl Image {
     /// }
     /// ```
     pub fn save(&self, name: &str) -> IoResult<()> {
-        let mut bmp_data = MemWriter::with_capacity(self.header.file_size as usize);
+        let mut bmp_data = Vec::with_capacity(self.header.file_size as usize);
         try!(self.write_header(&mut bmp_data));
         try!(self.write_data(&mut bmp_data));
 
         let mut bmp_file = try!(File::create(&Path::new(name)));
-        try!(bmp_file.write_all(bmp_data.get_ref()));
+        try!(bmp_file.write_all(&bmp_data[..]));
         Ok(())
     }
 
-    fn write_header(&self, bmp_data: &mut MemWriter) -> IoResult<()> {
+    fn write_header(&self, bmp_data: &mut Vec<u8>) -> IoResult<()> {
         let id = &self.magic;
         try!(bmp_data.write_all(&[id.magic1, id.magic2]));
 
@@ -370,7 +411,7 @@ impl Image {
         Ok(())
     }
 
-    fn write_data(&self, bmp_data: &mut MemWriter) -> IoResult<()> {
+    fn write_data(&self, bmp_data: &mut Vec<u8>) -> IoResult<()> {
         let padding: &[u8] = &[0; 4][0 .. self.padding as usize];
         for y in (0 .. self.height) {
             for x in (0 .. self.width) {
@@ -420,9 +461,23 @@ impl Image {
             num_imp_colors: try!(bmp_data.read_le_u32()),
         };
 
+        match dib_header.header_size {
+            // BMPv2 has a header size of 12 bytes
+            12 => return Err(BmpError::UnsupportedBmpVersion(BmpVersion::Version2)),
+            // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
+            40 if dib_header.compress_type == 3 => 
+                return Err(BmpError::UnsupportedBmpVersion(BmpVersion::Version3NT)),
+            // BMPv4 has more data in its header, it is currently ignored but we still try to parse it
+            108 | _ => ()
+        }
+
         if dib_header.bits_per_pixel != 24 {
             return Err(BmpError::UnsupportedBitsPerPixel(
                 format!("Expected 24, but was {}", dib_header.bits_per_pixel)));
+        }
+
+        if dib_header.compress_type != 0 {
+            return Err(BmpError::UnsupportedCompressionType);
         }
 
         let row_size = ((24.0 * dib_header.width as f32 + 31.0) / 32.0).floor() as u32 * 4;
@@ -435,14 +490,48 @@ impl Image {
         Ok(dib_header)
     }
 
+    fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) -> 
+                          BmpResult<Option<Vec<Pixel>>> {
+        let num_entries = match dh.bits_per_pixel {
+            // We have a color_palette if there are 8 or less bits per pixel
+            bpp @ 1 | bpp @ 4 | bpp @ 8 => 1 << bpp,
+            _ if dh.num_colors == 0 => return Ok(None),
+            // Or if num_colors in the dib header is not zero
+            _ => dh.num_colors as usize
+        };
+
+        let num_bytes = match dh.header_size {
+            // Each entry in the color_palette is four bytes for Version 3 or 4
+            40 | 108 => 4,
+            // Three bytes for Version two. Though, this is currently not supported
+            _ => return Err(BmpError::UnsupportedBmpVersion(BmpVersion::Version2))
+        };
+
+        let mut color_palette = Vec::with_capacity(num_entries);
+        for _ in 0 .. num_entries {
+            let (b, g, r) = (
+                try!(bmp_data.read_byte()),
+                try!(bmp_data.read_byte()),
+                try!(bmp_data.read_byte())
+            );
+            if num_bytes == 4 {
+                // Ignore the extra byte reserved for padding
+                let _ = bmp_data.read_byte();
+            }
+            color_palette.push(Pixel {r: r, g: g, b: b});
+        }
+
+        Ok(Some(color_palette))
+    }
+
     fn read_image_data(bmp_data: &mut MemReader, dh: &BmpDibHeader, offset: u32, padding: i64) ->
                        BmpResult<Vec<Pixel>> {
         let mut data = Vec::with_capacity(dh.data_size as usize);
         // seek until data
         try!(bmp_data.seek(offset as i64, SeekSet));
         // read pixels until padding
-        for _ in (0 .. dh.height) {
-            for _ in (0 .. dh.width) {
+        for _ in 0 .. dh.height {
+            for _ in 0 .. dh.width {
                 let [b, g, r] = [
                     try!(bmp_data.read_byte()),
                     try!(bmp_data.read_byte()),
