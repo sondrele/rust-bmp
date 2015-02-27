@@ -52,6 +52,14 @@ pub struct Pixel {
     pub b: u8
 }
 
+/// Macro to generate a `Pixel` from `r`, `g` and `b` values
+#[macro_export]
+macro_rules! px {
+    ($r:expr, $g:expr, $b:expr) => {
+        Pixel { r: $r as u8, g: $g as u8, b: $b as u8 }
+    }
+}
+
 /// Common color constants accessible by names.
 pub mod consts;
 
@@ -254,7 +262,7 @@ impl Image {
     pub fn new(width: u32, height: u32) -> Image {
         let mut data = Vec::with_capacity((width * height) as usize);
         for _ in 0 .. width * height {
-            data.push(Pixel {r: 0, g: 0, b: 0});
+            data.push(px!(0, 0, 0));
         }
 
         let padding = width % 4;
@@ -509,11 +517,10 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
         return Err(BmpError::UnsupportedCompressionType);
     }
 
-    let row_size = ((24.0 * dib_header.width as f32 + 31.0) / 32.0).floor() as u32 * 4;
-    let pixel_array_size = row_size * dib_header.height as u32;
-    if pixel_array_size != dib_header.data_size {
+    let (_, data_size) = file_size!(24, dib_header.width, dib_header.height);
+    if data_size != dib_header.data_size {
         return Err(BmpError::IncorrectDataSize(
-            format!("Expected {}, but was {}", pixel_array_size, dib_header.data_size)))
+            format!("Expected {}, but was {}", data_size, dib_header.data_size)))
     }
 
     Ok(dib_header)
@@ -540,7 +547,7 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
     let mut color_palette = Vec::with_capacity(num_entries);
     for _ in 0 .. num_entries {
         try!(bmp_data.read(&mut px));
-        color_palette.push(Pixel {r: px[2], g: px[1], b: px[0]});
+        color_palette.push(px!(px[2], px[1], px[0]));
         if num_bytes == 4 {
             // Ignore the extra byte reserved for padding
             let _ = bmp_data.read_byte();
@@ -584,7 +591,7 @@ fn read_image_data(bmp_data: &mut MemReader, dh: &BmpDibHeader, offset: u32, pad
     for _ in 0 .. dh.height {
         for _ in 0 .. dh.width {
             try!(bmp_data.read(&mut px));
-            data.push(Pixel {r: px[2], g: px[1], b: px[0]});
+            data.push(px!(px[2], px[1], px[0]));
         }
         // seek padding
         try!(bmp_data.seek(padding, SeekCur));
