@@ -4,7 +4,7 @@ use std::mem::size_of;
 use std::old_io::{File, SeekSet};
 use std::old_io::fs::PathExtensions;
 
-use {B, M, BmpError, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
+use {open, B, M, BmpError, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
 use consts;
 use consts::{RED, LIME, BLUE, WHITE};
 
@@ -53,7 +53,7 @@ fn verify_test_bmp_image(img: Image) {
 
 #[test]
 fn can_read_bmp_image() {
-    let bmp_img = Image::open("test/rgbw.bmp").unwrap();
+    let bmp_img = open("test/rgbw.bmp").unwrap();
     verify_test_bmp_image(bmp_img);
 }
 
@@ -82,7 +82,7 @@ fn can_read_image_data() {
 
 #[test]
 fn can_read_entire_bmp_image() {
-    let bmp_img = Image::open("test/rgbw.bmp").unwrap();
+    let bmp_img = open("test/rgbw.bmp").unwrap();
     assert_eq!(bmp_img.data.len(), 4);
 
     assert_eq!(bmp_img.get_pixel(0, 0), RED);
@@ -93,19 +93,19 @@ fn can_read_entire_bmp_image() {
 
 #[test]
 fn read_write_1pbb_bmp_image() {
-    let img = Image::open("test/bmptestsuite-0.9/valid/1bpp-1x1.bmp").unwrap();
+    let img = open("test/bmptestsuite-0.9/valid/1bpp-1x1.bmp").unwrap();
     assert_eq!(img.data.len(), 1);
     assert_eq!(img.get_pixel(0, 0), consts::BLACK);
 
     let _ = img.save("test/1bb-1x1.bmp");
-    let img = Image::open("test/1bb-1x1.bmp").unwrap();
+    let img = open("test/1bb-1x1.bmp").unwrap();
     assert_eq!(img.data.len(), 1);
     assert_eq!(img.get_pixel(0, 0), consts::BLACK);
 }
 
 #[test]
 fn error_when_opening_unexisting_image() {
-    let result = Image::open("test/no_img.bmp");
+    let result = open("test/no_img.bmp");
     match result {
         Err(BmpError::IoError(_)) => (/* Expected */),
         _ => panic!("Ghost image!?")
@@ -114,7 +114,7 @@ fn error_when_opening_unexisting_image() {
 
 #[test]
 fn error_when_opening_image_with_wrong_bits_per_pixel() {
-    let result = Image::open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp");
+    let result = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp");
     match result {
         Err(BmpError::UnsupportedBitsPerPixel(_)) => (/* Expected */),
         _ => panic!("4bpp should not be supported")
@@ -123,7 +123,7 @@ fn error_when_opening_image_with_wrong_bits_per_pixel() {
 
 #[test]
 fn error_when_opening_image_with_wrong_magic_numbers() {
-    let result = Image::open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
+    let result = open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
     match result {
         Err(BmpError::WrongMagicNumbers(_)) => (/* Expected */),
         _ => panic!("Wrong magic numbers should not be supported")
@@ -139,7 +139,7 @@ fn can_create_bmp_file() {
     bmp.set_pixel(1, 1, WHITE);
     let _ = bmp.save("test/rgbw_test.bmp");
 
-    let bmp_img = Image::open("test/rgbw_test.bmp").unwrap();
+    let bmp_img = open("test/rgbw_test.bmp").unwrap();
     assert_eq!(bmp_img.get_pixel(0, 0), RED);
     assert_eq!(bmp_img.get_pixel(1, 0), LIME);
     assert_eq!(bmp_img.get_pixel(0, 1), BLUE);
@@ -178,5 +178,5 @@ fn write_bmp(b: &mut test::Bencher) {
 
 #[bench]
 fn open_bmp(b: &mut test::Bencher) {
-    b.iter(|| Image::open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp"));
+    b.iter(|| open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp"));
 }

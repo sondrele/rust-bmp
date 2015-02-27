@@ -339,58 +339,6 @@ impl Image {
         ImageIndex::new(self.width as u32, self.height as u32)
     }
 
-    /// Returns a `BmpResult`, either containing an `Image` or a `BmpError`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// extern crate bmp;
-    ///
-    /// let img = match bmp::Image::open("test/rgbw.bmp") {
-    ///     Ok(img) => img,
-    ///     Err(e) => panic!("Failed to open: {}", e)
-    /// };
-    ///
-    /// ```
-    pub fn open(name: &str) -> BmpResult<Image> {
-        let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
-        let mut bmp_data = MemReader::new(try!(f.read_to_end()));
-
-        let id = try!(read_bmp_id(&mut bmp_data));
-        let header = try!(read_bmp_header(&mut bmp_data));
-        let dib_header = try!(read_bmp_dib_header(&mut bmp_data));
-
-        let color_palette = try!(read_color_palette(&mut bmp_data, &dib_header));
-
-        let padding = dib_header.width % 4;
-        let data = match color_palette {
-            Some(ref palette) => try!(
-                read_pixel_indexes(&mut bmp_data, &dib_header,
-                                   header.pixel_offset, palette, padding as i64)
-            ),
-            None => try!(
-                read_image_data(&mut bmp_data, &dib_header,
-                                header.pixel_offset, padding as i64)
-            )
-        };
-
-        let width = dib_header.width;
-        let height = dib_header.height;
-
-        let image = Image {
-            magic: id,
-            header: header,
-            dib_header: dib_header,
-            color_palette: color_palette,
-            width: width as u32,
-            height: height as u32,
-            padding: padding as u32,
-            data: data
-        };
-
-        Ok(image)
-    }
-
     /// Saves the image to the path specified by `name`. The function will overwrite the contents
     /// if a file already exists with the same name.
     ///
@@ -457,6 +405,58 @@ impl Image {
         }
         Ok(())
     }
+}
+
+/// Returns a `BmpResult`, either containing an `Image` or a `BmpError`.
+///
+/// # Example
+///
+/// ```
+/// extern crate bmp;
+///
+/// let img = match bmp::open("test/rgbw.bmp") {
+///     Ok(img) => img,
+///     Err(e) => panic!("Failed to open: {}", e)
+/// };
+///
+/// ```
+pub fn open(name: &str) -> BmpResult<Image> {
+    let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
+    let mut bmp_data = MemReader::new(try!(f.read_to_end()));
+
+    let id = try!(read_bmp_id(&mut bmp_data));
+    let header = try!(read_bmp_header(&mut bmp_data));
+    let dib_header = try!(read_bmp_dib_header(&mut bmp_data));
+
+    let color_palette = try!(read_color_palette(&mut bmp_data, &dib_header));
+
+    let padding = dib_header.width % 4;
+    let data = match color_palette {
+        Some(ref palette) => try!(
+            read_pixel_indexes(&mut bmp_data, &dib_header,
+                               header.pixel_offset, palette, padding as i64)
+        ),
+        None => try!(
+            read_image_data(&mut bmp_data, &dib_header,
+                            header.pixel_offset, padding as i64)
+        )
+    };
+
+    let width = dib_header.width;
+    let height = dib_header.height;
+
+    let image = Image {
+        magic: id,
+        header: header,
+        dib_header: dib_header,
+        color_palette: color_palette,
+        width: width as u32,
+        height: height as u32,
+        padding: padding as u32,
+        data: data
+    };
+
+    Ok(image)
 }
 
 fn read_bmp_id(bmp_data: &mut MemReader) -> BmpResult<BmpId> {
