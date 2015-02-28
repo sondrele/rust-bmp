@@ -435,6 +435,7 @@ pub fn open(name: &str) -> BmpResult<Image> {
         Some(ref palette) => match dib_header.bits_per_pixel {
             1 => try!(read_data_1bpp(&mut bmp_data, &dib_header, header.pixel_offset, palette, padding as i64)),
             4 => try!(read_data_4bpp(&mut bmp_data, &dib_header, header.pixel_offset, palette, padding as i64)),
+            8 => try!(read_data_8bpp(&mut bmp_data, &dib_header, header.pixel_offset, palette, padding as i64)),
             _ => panic!("Unsupported")
         },
         None => try!(
@@ -508,7 +509,7 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
 
     match dib_header.bits_per_pixel {
         // Currently supported
-        1 | 4 | 24 => (),
+        1 | 4 | 8 | 24 => (),
         other => return Err(
             BmpError::UnsupportedBitsPerPixel(format!("{}", dib_header.bits_per_pixel))
         )
@@ -549,7 +550,6 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
     for _ in 0 .. num_entries {
         try!(bmp_data.read(&mut px));
         color_palette.push(px!(px[2], px[1], px[0]));
-        println!("{:?}", color_palette);
         if num_bytes == 4 {
             // Ignore the extra byte reserved for padding
             let _ = bmp_data.read_byte();
@@ -565,12 +565,10 @@ fn read_data_1bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
     let num_bytes = Float::ceil(num_bits as f64 / 8.0) as usize;
 
     let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
-    // seek until data
     try!(bmp_data.seek(offset as i64, SeekSet));
     for _ in 0 .. dh.height {
         let bytes = try!(bmp_data.read_exact(num_bytes));
         let bits = BitVec::from_bytes(&bytes[..]);
-        // only iterate over the first
         for b in 0 .. num_bits as usize {
             match bits[b] {
                 true => data.push(palette[1]),
@@ -585,9 +583,7 @@ fn read_data_1bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
 fn read_data_4bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
                       offset: u32, palette: &Vec<Pixel>, padding: i64) -> BmpResult<Vec<Pixel>> {
     let num_bytes = Float::ceil(dh.width as f64 / 4.0) as usize;
-    println!("{:?}", num_bytes);
     let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
-    // seek until data
     try!(bmp_data.seek(offset as i64, SeekSet));
     for _ in 0 .. dh.height {
         let bytes = try!(bmp_data.read_exact(num_bytes));
@@ -596,6 +592,20 @@ fn read_data_4bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
                 true => { 4 >> (bytes[i] & 0xf0) }
                 false => { bytes[i] & 0x0f }
             };
+            data.push(palette[index as usize]);
+        }
+        try!(bmp_data.seek(padding, SeekCur));
+    }
+    Ok(data)
+}
+
+fn read_data_8bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
+                      offset: u32, palette: &Vec<Pixel>, padding: i64) -> BmpResult<Vec<Pixel>> {
+    let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
+    try!(bmp_data.seek(offset as i64, SeekSet));
+    for _ in 0 .. dh.height {
+        let bytes = try!(bmp_data.read_exact(dh.width as usize));
+        for index in bytes {
             data.push(palette[index as usize]);
         }
         try!(bmp_data.seek(padding, SeekCur));
