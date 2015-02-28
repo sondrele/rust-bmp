@@ -432,10 +432,11 @@ pub fn open(name: &str) -> BmpResult<Image> {
 
     let padding = dib_header.width % 4;
     let data = match color_palette {
-        Some(ref palette) => try!(
-            read_pixel_indexes(&mut bmp_data, &dib_header,
-                               header.pixel_offset, palette, padding as i64)
-        ),
+        Some(ref palette) => match dib_header.bits_per_pixel {
+            1 => try!(read_data_1bpp(&mut bmp_data, &dib_header, header.pixel_offset, palette, padding as i64)),
+            4 => try!(read_data_4bpp(&mut bmp_data, &dib_header, header.pixel_offset, palette, padding as i64)),
+            _ => panic!("Unsupported")
+        },
         None => try!(
             read_image_data(&mut bmp_data, &dib_header,
                             header.pixel_offset, padding as i64)
@@ -507,7 +508,7 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
 
     match dib_header.bits_per_pixel {
         // Currently supported
-        1 | 24 => (),
+        1 | 4 | 24 => (),
         other => return Err(
             BmpError::UnsupportedBitsPerPixel(format!("{}", dib_header.bits_per_pixel))
         )
@@ -529,11 +530,11 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
 fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
                       BmpResult<Option<Vec<Pixel>>> {
     let num_entries = match dh.bits_per_pixel {
-        // We have a color_palette if there are 8 or less bits per pixel
+        // We have a color_palette if there if num_colors in the dib header is not zero
+        _ if dh.num_colors != 0 => dh.num_colors as usize,
+        // Or if there are 8 or less bits per pixel
         bpp @ 1 | bpp @ 4 | bpp @ 8 => 1 << bpp,
-        _ if dh.num_colors == 0 => return Ok(None),
-        // Or if num_colors in the dib header is not zero
-        _ => dh.num_colors as usize
+        _ => return Ok(None)
     };
 
     let num_bytes = match dh.header_size {
@@ -548,6 +549,7 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
     for _ in 0 .. num_entries {
         try!(bmp_data.read(&mut px));
         color_palette.push(px!(px[2], px[1], px[0]));
+        println!("{:?}", color_palette);
         if num_bytes == 4 {
             // Ignore the extra byte reserved for padding
             let _ = bmp_data.read_byte();
@@ -557,11 +559,10 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
     Ok(Some(color_palette))
 }
 
-fn read_pixel_indexes(bmp_data: &mut MemReader, dh: &BmpDibHeader,
+fn read_data_1bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
                       offset: u32, palette: &Vec<Pixel>, padding: i64) -> BmpResult<Vec<Pixel>> {
     let num_bits = dh.width;
     let num_bytes = Float::ceil(num_bits as f64 / 8.0) as usize;
-    let overflow = 8 - num_bits % 8;
 
     let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
     // seek until data
@@ -575,6 +576,27 @@ fn read_pixel_indexes(bmp_data: &mut MemReader, dh: &BmpDibHeader,
                 true => data.push(palette[1]),
                 false => data.push(palette[0])
             }
+        }
+        try!(bmp_data.seek(padding, SeekCur));
+    }
+    Ok(data)
+}
+
+fn read_data_4bpp(bmp_data: &mut MemReader, dh: &BmpDibHeader,
+                      offset: u32, palette: &Vec<Pixel>, padding: i64) -> BmpResult<Vec<Pixel>> {
+    let num_bytes = Float::ceil(dh.width as f64 / 4.0) as usize;
+    println!("{:?}", num_bytes);
+    let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
+    // seek until data
+    try!(bmp_data.seek(offset as i64, SeekSet));
+    for _ in 0 .. dh.height {
+        let bytes = try!(bmp_data.read_exact(num_bytes));
+        for i in 0 .. bytes.len() {
+            let index = match i % 2 == 0 {
+                true => { 4 >> (bytes[i] & 0xf0) }
+                false => { bytes[i] & 0x0f }
+            };
+            data.push(palette[index as usize]);
         }
         try!(bmp_data.seek(padding, SeekCur));
     }

@@ -104,6 +104,22 @@ fn read_write_1pbb_bmp_image() {
 }
 
 #[test]
+fn read_write_4pbb_bmp_image() {
+    let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap_or_else(|e| {
+        panic!("{}", e);
+    });
+    assert_eq!(img.data.len(), 1);
+    assert_eq!(img.get_pixel(0, 0), consts::BLUE);
+
+    let _ = img.save("test/4bb-1x1.bmp");
+    let img = open("test/4bb-1x1.bmp").unwrap_or_else(|e| {
+        panic!("{}", e);
+    });
+    assert_eq!(img.data.len(), 1);
+    assert_eq!(img.get_pixel(0, 0), consts::BLUE);
+}
+
+#[test]
 fn error_when_opening_unexisting_image() {
     let result = open("test/no_img.bmp");
     match result {
@@ -114,10 +130,10 @@ fn error_when_opening_unexisting_image() {
 
 #[test]
 fn error_when_opening_image_with_wrong_bits_per_pixel() {
-    let result = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp");
+    let result = open("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
     match result {
         Err(BmpError::UnsupportedBitsPerPixel(_)) => (/* Expected */),
-        _ => panic!("4bpp should not be supported")
+        _ => panic!("32bpp should not be supported")
     }
 }
 
