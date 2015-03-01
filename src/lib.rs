@@ -4,29 +4,35 @@
 #![feature(core, old_io, old_path)]
 #![cfg_attr(test, feature(test))]
 
-//! A small library for reading and writing 24-bit BMP images.
+//! A small library for reading and writing BMP images.
 //!
-//!# Example
+//! The library supports uncompressed BMP Version 3 images.
+//! The different decoding and encoding schemes is shown in the table below.
 //!
-//!```
-//!extern crate bmp;
+//! |Scheme | Decoding | Encoding | Compression |
+//! |-------|----------|----------|-------------|
+//! | 24 bpp| ✓        | ✓       | No
+//! | 8 bpp | ✓        | ✗       | No
+//! | 4 bpp | ✓        | ✗       | No
+//! | 1 bpp | ✓        | ✗       | No
 //!
-//!use bmp::{Image, Pixel};
+//! # Example
 //!
-//!fn main() {
-//!    let mut img = Image::new(256, 256);
+//! ```
+//! #[macro_use]
+//! extern crate bmp;
+//! use bmp::{Image, Pixel};
 //!
-//!    for (x, y) in img.coordinates() {
-//!        img.set_pixel(x, y, Pixel {
-//!            r: (x - y / 256) as u8,
-//!            g: (y - x / 256) as u8,
-//!            b: (x + y / 256) as u8
-//!        })
-//!    }
-//!    let _ = img.save("img.bmp");
-//!}
+//! fn main() {
+//!     let mut img = Image::new(256, 256);
 //!
-//!```
+//!     for (x, y) in img.coordinates() {
+//!         img.set_pixel(x, y, px!(x - y / 255, y - x / 255, x + y / 255));
+//!     }
+//!     let _ = img.save("img.bmp");
+//! }
+//! ```
+//!
 
 use std::collections::BitVec;
 use std::fmt;
@@ -47,7 +53,7 @@ mod tests;
 const B: u8 = 66;
 const M: u8 = 77;
 
-/// The pixel data used in the `Image`
+/// The pixel data used in the `Image`.
 ///
 /// It has three values for the `red`, `blue` and `green` color channels, respectively.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,7 +63,7 @@ pub struct Pixel {
     pub b: u8
 }
 
-/// Macro to generate a `Pixel` from `r`, `g` and `b` values
+/// Macro to generate a `Pixel` from `r`, `g` and `b` values.
 #[macro_export]
 macro_rules! px {
     ($r:expr, $g:expr, $b:expr) => {
@@ -71,7 +77,7 @@ pub mod consts;
 /// A result type, either containing an `Image` or a `BmpError`.
 pub type BmpResult<T> = Result<T, BmpError>;
 
-/// The different kinds of BMP errors available
+/// The different kinds of possible BMP errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BmpErrorKind {
     WrongMagicNumbers,
@@ -260,7 +266,7 @@ impl BmpDibHeader {
 /// The image is accessed in row-major order from top to bottom,
 /// where point (0, 0) is defined to be in the upper left corner of the image.
 ///
-/// Currently, only 24-bit, uncompressed BMP images are supported.
+/// Currently, only uncompressed BMP images are supported.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Image {
     magic: BmpId,
@@ -325,19 +331,19 @@ impl Image {
         }
     }
 
-    /// Returns the `width` of the Image
+    /// Returns the `width` of the Image.
     #[inline]
     pub fn get_width(&self) -> u32 {
         self.width
     }
 
-    /// Returns the `height` of the Image
+    /// Returns the `height` of the Image.
     #[inline]
     pub fn get_height(&self) -> u32 {
         self.height
     }
 
-    /// Set the pixel value at the position of `width` and `height`
+    /// Set the pixel value at the position of `width` and `height`.
     ///
     /// # Example
     ///
@@ -352,7 +358,7 @@ impl Image {
         self.data[((self.height - y - 1) * self.width + x) as usize] = val;
     }
 
-    /// Returns the pixel value at the position of `width` and `height`
+    /// Returns the pixel value at the position of `width` and `height`.
     ///
     /// # Example
     ///
@@ -387,7 +393,7 @@ impl Image {
     /// Saves the image to the path specified by `name`. The function will overwrite the contents
     /// if a file already exists with the same name.
     ///
-    /// The function returns the `IoResult` returned from the underlying `Reader`.
+    /// The function returns the `IoResult` from the underlying `Reader`.
     ///
     /// # Example
     ///
@@ -484,7 +490,6 @@ pub fn open(name: &str) -> BmpResult<Image> {
             read_pixels(&mut bmp_data, width, height, header.pixel_offset, padding as i64)
         )
     };
-
 
     let image = Image {
         magic: id,
