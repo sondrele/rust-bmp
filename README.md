@@ -38,12 +38,11 @@ let _ = img.save("path/to/img.bmp");
 Open an existing image with the `open` function, by specifying the `path`. The function
 returns a `BmpResult`, that contains either a `Image` or a `BmpError`.
 ```rust
-let mut img = match Image::open("path/to/img.bmp") {
-    Ok(img) => img,
-    Err(e) => panic!("{}", e)
-};
-// or ...
-let mut img = Image::open("path/to/img.bmp").unwrap();
+extern crate bmp;
+
+let img = bmp::open("path/to/img.bmp").unwrap_or_else(|e| {
+    panic!("Failed to open: {}", e);
+});
 ```
 Coordinate convention
 ---------------------
@@ -52,21 +51,16 @@ upper left corner of the image.
 Example
 -------
 ```rust
+#[macro_use]
 extern crate bmp;
-
 use bmp::{Image, Pixel};
 
 fn main() {
     let mut img = Image::new(256, 256);
 
     for (x, y) in img.coordinates() {
-        img.set_pixel(x, y, Pixel {
-            r: (x - y / 256) as u8,
-            g: (y - x / 256) as u8,
-            b: (x + y / 256) as u8
-        })
+        img.set_pixel(x, y, px!(x - y / 255, y - x / 255, x + y / 255));
     }
     let _ = img.save("img.bmp");
 }
-
 ```
