@@ -32,9 +32,13 @@ use std::collections::BitVec;
 use std::fmt;
 use std::num::Float;
 use std::iter::Iterator;
-use std::old_io::{File, IoResult, IoError, MemReader, Open, Read, SeekSet, SeekCur};
+use std::old_io::{File, IoError, IoResult, MemReader, Open, Read, SeekSet, SeekCur};
 use std::old_path::Path;
 use std::error::{Error, FromError};
+
+use ::BmpErrorKind::*;
+use ::BmpVersion::*;
+use ::CompressionType::*;
 
 #[cfg(test)]
 mod tests;
@@ -66,46 +70,63 @@ pub mod consts;
 /// A result type, either containing an `Image` or a `BmpError`.
 pub type BmpResult<T> = Result<T, BmpError>;
 
+/// The different kinds of BMP errors available
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BmpErrorKind {
+    WrongMagicNumbers,
+    UnsupportedBitsPerPixel,
+    UnsupportedCompressionType,
+    UnsupportedBmpVersion,
+    Other,
+    BmpIoError(IoError)
+}
+
 /// The error type returned if the decoding of an image from disk fails.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum BmpError {
-    WrongMagicNumbers(String),
-    UnsupportedBitsPerPixel(String),
-    UnsupportedCompressionType,
-    UnsupportedBmpVersion(String),
-    IncorrectDataSize(String),
-    Other(String),
-    IoError(std::old_io::IoError)
+pub struct BmpError {
+    pub kind: BmpErrorKind,
+    pub details: String,
+}
+
+impl BmpError {
+    fn new<T: Str>(kind: BmpErrorKind, details: T) -> BmpError {
+        let description = match kind {
+            WrongMagicNumbers => "Wrong magic numbers",
+            UnsupportedBitsPerPixel => "Unsupported bits per pixel",
+            UnsupportedCompressionType => "Unsupported compression type",
+            UnsupportedBmpVersion => "Unsupported BMP version",
+            _ => "BMP Error",
+        };
+
+        BmpError {
+            kind: kind,
+            details: format!("{}: {}", description, details.as_slice())
+        }
+    }
 }
 
 impl fmt::Display for BmpError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            BmpError::WrongMagicNumbers(ref details) =>
-                write!(fmt, "Wrong magic numbers: {}", details),
-            BmpError::UnsupportedBitsPerPixel(ref details) =>
-                write!(fmt, "Unsupported bits per pixel: {}", details),
-            BmpError::UnsupportedCompressionType =>
-                write!(fmt, "Unsupported compression type: RLE compression not supported"),
-            BmpError::UnsupportedBmpVersion(ref details) =>
-                write!(fmt, "Unsupported BMP version: {}", details),
-            BmpError::IncorrectDataSize(ref details) =>
-                write!(fmt, "Incorrect size of image data: {}", details),
-            BmpError::Other(ref details) =>
-                write!(fmt, "BMP Error: {}", details),
-            BmpError::IoError(ref error) => error.fmt(fmt)
+        match self.kind {
+            BmpIoError(ref error) => return error.fmt(fmt),
+            _ => write!(fmt, "{}", self.description())
         }
     }
 }
 
 impl FromError<IoError> for BmpError {
     fn from_error(err: IoError) -> BmpError {
-        BmpError::IoError(err)
+        BmpError::new(BmpIoError(err), "Io Error")
     }
 }
 
 impl Error for BmpError {
-    fn description(&self) -> &str { "BMP image error" }
+    fn description(&self) -> &str {
+        match self.kind {
+            BmpIoError(ref e) => e.description(),
+            _ => &self.details[..]
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -117,26 +138,47 @@ enum BmpVersion {
     Version4,
 }
 
-impl fmt::Display for BmpVersion {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+impl Str for BmpVersion {
+    fn as_slice(&self) -> &str {
         match *self {
-            BmpVersion::Version1 => write!(fmt, "BMP Version 1"),
-            BmpVersion::Version2 => write!(fmt, "BMP Version 2"),
-            BmpVersion::Version3 => write!(fmt, "BMP Version 3"),
-            BmpVersion::Version3NT => write!(fmt, "BMP Version 3 NT"),
-            BmpVersion::Version4 => write!(fmt, "BMP Version 4")
+            Version1   => "BMP Version 1",
+            Version2   => "BMP Version 2",
+            Version3   => "BMP Version 3",
+            Version3NT => "BMP Version 3 NT",
+            Version4   => "BMP Version 4",
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[repr(u32)]
 enum CompressionType {
     Uncompressed,
     Rle8bit,
     Rle4bit,
     // Only for BMP version 4
     BitfieldsEncoding,
+}
+
+impl CompressionType {
+    fn from_u32(val: u32) -> CompressionType {
+        match val {
+            1 => Rle8bit,
+            2 => Rle4bit,
+            3 => BitfieldsEncoding,
+            _ => Uncompressed,
+        }
+    }
+}
+
+impl Str for CompressionType {
+    fn as_slice(&self) -> &str {
+        match *self {
+            Rle8bit           => "RLE 8-bit",
+            Rle4bit           => "RLE 4-bit",
+            BitfieldsEncoding => "Bitfields Encoding",
+            Uncompressed      => "Uncompressed",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -352,10 +394,9 @@ impl Image {
     /// extern crate bmp;
     ///
     /// let mut img = bmp::Image::new(100, 100);
-    /// match img.save("black.bmp") {
-    ///     Ok(_) => (/* Success */),
-    ///     Err(e) => panic!("Failed to save: {}", e)
-    /// }
+    /// let _ = img.save("black.bmp").unwrap_or_else(|e| {
+    ///     panic!("Failed to save: {}", e)
+    /// });
     /// ```
     pub fn save(&self, name: &str) -> IoResult<()> {
         // only 24 bpp encoding supported
@@ -415,11 +456,9 @@ impl Image {
 /// ```
 /// extern crate bmp;
 ///
-/// let img = match bmp::open("test/rgbw.bmp") {
-///     Ok(img) => img,
-///     Err(e) => panic!("Failed to open: {}", e)
-/// };
-///
+/// let img = bmp::open("test/rgbw.bmp").unwrap_or_else(|e| {
+///    panic!("Failed to open: {}", e);
+/// });
 /// ```
 pub fn open(name: &str) -> BmpResult<Image> {
     let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
@@ -463,7 +502,7 @@ fn read_bmp_id(bmp_data: &mut MemReader) -> BmpResult<BmpId> {
 
     match (m1, m2) {
         (B, M) => Ok(BmpId::new()),
-        (m1, m2) => Err(BmpError::WrongMagicNumbers(
+        (m1, m2) => Err(BmpError::new(WrongMagicNumbers,
                         format!("Expected '66 77', but was '{} {}'", m1, m2))),
     }
 }
@@ -496,10 +535,10 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
 
     match dib_header.header_size {
         // BMPv2 has a header size of 12 bytes
-        12 => return Err(BmpError::UnsupportedBmpVersion(format!("{}", BmpVersion::Version2))),
+        12 => return Err(BmpError::new(UnsupportedBmpVersion, Version2)),
         // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
         40 if dib_header.compress_type == 3 =>
-            return Err(BmpError::UnsupportedBmpVersion(format!("{}", BmpVersion::Version3NT))),
+            return Err(BmpError::new(UnsupportedBmpVersion, Version3NT)),
         // BMPv4 has more data in its header, it is currently ignored but we still try to parse it
         108 | _ => ()
     }
@@ -508,12 +547,13 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
         // Currently supported
         1 | 4 | 8 | 24 => (),
         other => return Err(
-            BmpError::UnsupportedBitsPerPixel(format!("{}", other))
+            BmpError::new(UnsupportedBitsPerPixel, format!("{}", other))
         )
     }
 
-    if dib_header.compress_type != 0 {
-        return Err(BmpError::UnsupportedCompressionType)
+    match CompressionType::from_u32(dib_header.compress_type) {
+        Uncompressed => (),
+        other => return Err(BmpError::new(UnsupportedCompressionType, other)),
     }
 
     Ok(dib_header)
@@ -533,7 +573,7 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
         // Each entry in the color_palette is four bytes for Version 3 or 4
         40 | 108 => 4,
         // Three bytes for Version two. Though, this is currently not supported
-        _ => return Err(BmpError::UnsupportedBmpVersion(format!("{}", BmpVersion::Version2)))
+        _ => return Err(BmpError::new(UnsupportedBmpVersion, Version2))
     };
 
     let mut px = &mut [0; 4][0 .. num_bytes as usize];
@@ -581,7 +621,7 @@ fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
                     data.push(palette[index as usize]);
                 }
             },
-            other => return Err(BmpError::Other(
+            other => return Err(BmpError::new(Other,
                 format!("BMP does not support color palettes for {} bits per pixel", other)))
         }
         match bytes_per_row % 4 {
@@ -612,7 +652,8 @@ fn read_pixels(bmp_data: &mut MemReader, dh: &BmpDibHeader, offset: u32, padding
 
 /// An `Iterator` returning the `x` and `y` coordinates of an image.
 ///
-/// It supports iteration over an image in row-major order, starting from in the upper left corner of the image.
+/// It supports iteration over an image in row-major order,
+/// starting from in the upper left corner of the image.
 #[derive(Copy)]
 pub struct ImageIndex {
     width: u32,
