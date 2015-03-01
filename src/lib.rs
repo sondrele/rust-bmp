@@ -31,6 +31,7 @@
 use std::collections::BitVec;
 use std::fmt;
 use std::num::Float;
+use std::num::SignedInt;
 use std::iter::Iterator;
 use std::old_io::{File, IoError, IoResult, MemReader, Open, Read, SeekSet, SeekCur};
 use std::old_path::Path;
@@ -424,14 +425,14 @@ impl Image {
         try!(bmp_data.write_le_u32(dib_header.header_size));
         try!(bmp_data.write_le_i32(dib_header.width));
         try!(bmp_data.write_le_i32(dib_header.height));
-        try!(bmp_data.write_le_u16(dib_header.num_planes));
+        try!(bmp_data.write_le_u16(1));  // num_planes
         try!(bmp_data.write_le_u16(24)); // bits_per_pixel
-        try!(bmp_data.write_le_u32(dib_header.compress_type));
-        try!(bmp_data.write_le_u32(dib_header.data_size));
+        try!(bmp_data.write_le_u32(0));  // compress_type
+        try!(bmp_data.write_le_u32(data_size));
         try!(bmp_data.write_le_i32(dib_header.hres));
         try!(bmp_data.write_le_i32(dib_header.vres));
         try!(bmp_data.write_le_u32(0)); // num_colors
-        try!(bmp_data.write_le_u32(dib_header.num_imp_colors));
+        try!(bmp_data.write_le_u32(0)); // num_imp_colors
         Ok(())
     }
 
@@ -470,27 +471,29 @@ pub fn open(name: &str) -> BmpResult<Image> {
 
     let color_palette = try!(read_color_palette(&mut bmp_data, &dib_header));
 
-    let padding = dib_header.width % 4;
+    let width = dib_header.width.abs() as u32;
+    let height = dib_header.height.abs() as u32;
+    let padding = width % 4;
+
     let data = match color_palette {
         Some(ref palette) => try!(
-            read_indexes(&mut bmp_data, &palette, &dib_header, header.pixel_offset)
+            read_indexes(&mut bmp_data, &palette, width, height,
+                         dib_header.bits_per_pixel, header.pixel_offset)
         ),
         None => try!(
-            read_pixels(&mut bmp_data, &dib_header, header.pixel_offset, padding as i64)
+            read_pixels(&mut bmp_data, width, height, header.pixel_offset, padding as i64)
         )
     };
 
-    let width = dib_header.width;
-    let height = dib_header.height;
 
     let image = Image {
         magic: id,
         header: header,
         dib_header: dib_header,
         color_palette: color_palette,
-        width: width as u32,
-        height: height as u32,
-        padding: padding as u32,
+        width: width,
+        height: height,
+        padding: padding,
         data: data
     };
 
@@ -587,19 +590,19 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
 }
 
 fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
-                dh: &BmpDibHeader, offset: u32) -> BmpResult<Vec<Pixel>> {
-    let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
+                width: u32, height: u32, bpp: u16, offset: u32) -> BmpResult<Vec<Pixel>> {
+    let mut data = Vec::with_capacity((height * width) as usize);
     // Number of bytes to read from each row, varies based on bits_per_pixel
-    let bytes_per_row = Float::ceil(dh.width as f64 / (8.0 / dh.bits_per_pixel as f64)) as usize;
+    let bytes_per_row = Float::ceil(width as f64 / (8.0 / bpp as f64)) as usize;
     // seek until data
     try!(bmp_data.seek(offset as i64, SeekSet));
-    for _ in 0 .. dh.height {
+    for _ in 0 .. height {
         let bytes = try!(bmp_data.read_exact(bytes_per_row));
         // determine how to parse each row, depending on bits_per_pixel
-        match dh.bits_per_pixel {
+        match bpp {
             1 => {
                 let bits = BitVec::from_bytes(&bytes[..]);
-                for b in 0 .. dh.width as usize {
+                for b in 0 .. width as usize {
                     match bits[b] {
                         true => data.push(palette[1]),
                         false => data.push(palette[0])
@@ -612,7 +615,7 @@ fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
                     index.push((b >> 4));
                     index.push((b & 0x0f));
                 }
-                for i in 0 .. dh.width as usize {
+                for i in 0 .. width as usize {
                     data.push(palette[index[i] as usize]);
                 }
             },
@@ -632,15 +635,15 @@ fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
     Ok(data)
 }
 
-fn read_pixels(bmp_data: &mut MemReader, dh: &BmpDibHeader, offset: u32, padding: i64) ->
-                   BmpResult<Vec<Pixel>> {
-    let mut data = Vec::with_capacity((dh.height * dh.width) as usize);
+fn read_pixels(bmp_data: &mut MemReader, width: u32, height: u32,
+               offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
+    let mut data = Vec::with_capacity((height * width) as usize);
     // seek until data
     try!(bmp_data.seek(offset as i64, SeekSet));
     // read pixels until padding
     let mut px = [0; 3];
-    for _ in 0 .. dh.height {
-        for _ in 0 .. dh.width {
+    for _ in 0 .. height {
+        for _ in 0 .. width {
             try!(bmp_data.read(&mut px));
             data.push(px!(px[2], px[1], px[0]));
         }
