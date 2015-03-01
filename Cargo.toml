@@ -1,14 +1,17 @@
 [package]
 
 name = "bmp"
-version = "0.0.8"
+version = "0.1.0"
 authors = ["Sondre Lefsaker"]
 
-description = "Small library for reading and writing BMP images in Rust"
-repository = "https://github.com/sondrele/rust-bmp"
+description = "Small library for reading and writing BMP images in Rust."
+documentation = "http://sondrele.github.io/rust-bmp/bmp/index.html"
+repository = "https://github.com/sondrele/rust-bmp.git"
+homepage = "https://github.com/sondrele/rust-bmp"
 
+license = "MIT"
 readme = "README.md"
 
 keywords = ["bmp", "image"]
 
-license = "MIT"
+exclude = ["test"]
