@@ -2,7 +2,8 @@ extern crate test;
 
 use std::mem::size_of;
 use std::old_io::{File, SeekSet};
-use std::old_io::fs::PathExtensions;
+use std::path;
+use std::fs::PathExt;
 
 use {open, B, M, BmpError, BmpErrorKind, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
 use consts;
@@ -20,9 +21,9 @@ fn size_of_bmp_header_is_54_bytes() {
 
 #[test]
 fn size_of_4pixel_bmp_image_is_70_bytes() {
-    let path_wd = Path::new("test/rgbw.bmp");
-    match path_wd.lstat() {
-        Ok(stat) => assert_eq!(70, stat.size as i32),
+    let path_wd = path::Path::new("test/rgbw.bmp");
+    match path_wd.metadata() {
+        Ok(stat) => assert_eq!(70, stat.len() as i32),
         Err(_) => (/* Ignore IoError for now */)
     }
 }

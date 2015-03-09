@@ -1,5 +1,5 @@
 #![crate_type = "lib"]
-#![deny(warnings)]
+#![warn(warnings)]
 #![feature(collections)]
 #![feature(core, old_io, old_path)]
 #![cfg_attr(test, feature(test))]
