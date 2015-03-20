@@ -15,3 +15,6 @@ readme = "README.md"
 keywords = ["bmp", "image"]
 
 exclude = ["test"]
+
+[dependencies]
+byteorder = "0.3"
