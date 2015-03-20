@@ -1,11 +1,12 @@
 extern crate test;
 
-use std::mem::size_of;
-use std::old_io::{File, SeekSet};
-use std::path;
+use std::fs;
 use std::fs::PathExt;
+use std::io::{Read, Seek, SeekFrom};
+use std::mem::size_of;
+use std::path;
 
-use {open, B, M, BmpError, BmpErrorKind, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
+use {open, BmpError, BmpErrorKind, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
 use consts;
 
 #[test]
@@ -59,25 +60,13 @@ fn can_read_bmp_image() {
 
 #[test]
 fn can_read_image_data() {
-    let mut f = match File::open(&Path::new("test/rgbw.bmp")) {
-        Ok(file) => file,
-        Err(e) => panic!("File error: {}", e)
-    };
-    assert_eq!(B, f.read_byte().unwrap());
-    assert_eq!(M, f.read_byte().unwrap());
+    let mut f = fs::File::open("test/rgbw.bmp").unwrap();
+    f.seek(SeekFrom::Start(54)).unwrap();
 
-    match f.seek(54, SeekSet) {
-        Ok(_) => (),
-        Err(e) => panic!("Seek error: {}", e)
-    }
+    let mut px = [0; 3];
+    f.read(&mut px).unwrap();
 
-    let pixel = Pixel {
-        r: f.read_byte().unwrap(),
-        g: f.read_byte().unwrap(),
-        b: f.read_byte().unwrap()
-    };
-
-    assert_eq!(pixel, consts::RED);
+    assert_eq!(Pixel {r: px[2], g: px[1], b: px[0] }, consts::BLUE);
 }
 
 #[test]
