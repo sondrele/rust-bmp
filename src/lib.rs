@@ -1,7 +1,7 @@
 #![crate_type = "lib"]
 #![warn(warnings)]
 #![feature(collections)]
-#![feature(core, old_io, old_path)]
+#![feature(core, io)]
 #![cfg_attr(test, feature(test))]
 
 //! A small library for reading and writing BMP images.
@@ -34,18 +34,22 @@
 //! ```
 //!
 
+extern crate byteorder;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+
 use std::collections::BitVec;
+use std::error::{Error, FromError};
 use std::fmt;
+use std::fs;
 use std::num::Float;
 use std::num::SignedInt;
+use std::io;
+use std::io::{Cursor, Read, Write, SeekFrom, Seek};
 use std::iter::Iterator;
-use std::old_io::{File, IoError, IoResult, MemReader, Open, Read, SeekSet, SeekCur};
-use std::old_path::Path;
-use std::error::{Error, FromError};
 
+use ::CompressionType::*;
 use ::BmpErrorKind::*;
 use ::BmpVersion::*;
-use ::CompressionType::*;
 
 #[cfg(test)]
 mod tests;
@@ -85,7 +89,8 @@ pub enum BmpErrorKind {
     UnsupportedCompressionType,
     UnsupportedBmpVersion,
     Other,
-    BmpIoError(IoError)
+    BmpIoError(io::Error),
+    BmpByteorderError(byteorder::Error),
 }
 
 /// The error type returned if the decoding of an image from disk fails.
@@ -121,17 +126,24 @@ impl fmt::Display for BmpError {
     }
 }
 
-impl FromError<IoError> for BmpError {
-    fn from_error(err: IoError) -> BmpError {
+impl FromError<io::Error> for BmpError {
+    fn from_error(err: io::Error) -> BmpError {
         BmpError::new(BmpIoError(err), "Io Error")
+    }
+}
+
+impl FromError<byteorder::Error> for BmpError {
+    fn from_error(err: byteorder::Error) -> BmpError {
+        BmpError::new(BmpByteorderError(err), "Byteorder Error")
     }
 }
 
 impl Error for BmpError {
     fn description(&self) -> &str {
         match self.kind {
-            BmpIoError(ref e) => e.description(),
-            _ => &self.details[..]
+            BmpIoError(ref e) => Error::description(e),
+            BmpByteorderError(ref e) => Error::description(e),
+            _ => &self.details
         }
     }
 }
@@ -393,7 +405,7 @@ impl Image {
     /// Saves the image to the path specified by `name`. The function will overwrite the contents
     /// if a file already exists with the same name.
     ///
-    /// The function returns the `IoResult` from the underlying `Reader`.
+    /// The function returns the `io::Result` from the underlying `Reader`.
     ///
     /// # Example
     ///
@@ -405,52 +417,52 @@ impl Image {
     ///     panic!("Failed to save: {}", e)
     /// });
     /// ```
-    pub fn save(&self, name: &str) -> IoResult<()> {
+    pub fn save(&self, name: &str) -> io::Result<()> {
         // only 24 bpp encoding supported
         let mut bmp_data = Vec::with_capacity(self.header.file_size as usize);
         try!(self.write_header(&mut bmp_data));
         try!(self.write_data(&mut bmp_data));
 
-        let mut bmp_file = try!(File::create(&Path::new(name)));
-        try!(bmp_file.write_all(&bmp_data[..]));
+        let mut bmp_file = try!(fs::File::create(name));
+        try!(bmp_file.write(&bmp_data));
         Ok(())
     }
 
-    fn write_header(&self, bmp_data: &mut Vec<u8>) -> IoResult<()> {
+    fn write_header(&self, bmp_data: &mut Vec<u8>) -> io::Result<()> {
         let header = &self.header;
         let dib_header = &self.dib_header;
-        let (header_size, data_size) = file_size!(24, dib_header.width, dib_header.height);
+        let (header_size, data_size) = file_size!(24, self.width, self.height);
 
-        try!(bmp_data.write_all(&[B, M]));
+        try!(std::io::Write::write(bmp_data, &[B, M]));
 
-        try!(bmp_data.write_le_u32(header_size + data_size));
-        try!(bmp_data.write_le_u16(header.creator1));
-        try!(bmp_data.write_le_u16(header.creator2));
-        try!(bmp_data.write_le_u32(header_size)); // pixel_offset
+        try!(bmp_data.write_u32::<LittleEndian>(header_size + data_size));
+        try!(bmp_data.write_u16::<LittleEndian>(header.creator1));
+        try!(bmp_data.write_u16::<LittleEndian>(header.creator2));
+        try!(bmp_data.write_u32::<LittleEndian>(header_size)); // pixel_offset
 
-        try!(bmp_data.write_le_u32(dib_header.header_size));
-        try!(bmp_data.write_le_i32(dib_header.width));
-        try!(bmp_data.write_le_i32(dib_header.height));
-        try!(bmp_data.write_le_u16(1));  // num_planes
-        try!(bmp_data.write_le_u16(24)); // bits_per_pixel
-        try!(bmp_data.write_le_u32(0));  // compress_type
-        try!(bmp_data.write_le_u32(data_size));
-        try!(bmp_data.write_le_i32(dib_header.hres));
-        try!(bmp_data.write_le_i32(dib_header.vres));
-        try!(bmp_data.write_le_u32(0)); // num_colors
-        try!(bmp_data.write_le_u32(0)); // num_imp_colors
+        try!(bmp_data.write_u32::<LittleEndian>(dib_header.header_size));
+        try!(bmp_data.write_i32::<LittleEndian>(dib_header.width));
+        try!(bmp_data.write_i32::<LittleEndian>(dib_header.height));
+        try!(bmp_data.write_u16::<LittleEndian>(1));  // num_planes
+        try!(bmp_data.write_u16::<LittleEndian>(24)); // bits_per_pixel
+        try!(bmp_data.write_u32::<LittleEndian>(0));  // compress_type
+        try!(bmp_data.write_u32::<LittleEndian>(data_size));
+        try!(bmp_data.write_i32::<LittleEndian>(dib_header.hres));
+        try!(bmp_data.write_i32::<LittleEndian>(dib_header.vres));
+        try!(bmp_data.write_u32::<LittleEndian>(0)); // num_colors
+        try!(bmp_data.write_u32::<LittleEndian>(0)); // num_imp_colors
         Ok(())
     }
 
-    fn write_data(&self, bmp_data: &mut Vec<u8>) -> IoResult<()> {
+    fn write_data(&self, bmp_data: &mut Vec<u8>) -> io::Result<()> {
         let padding = &[0; 4][0 .. self.padding as usize];
         for y in 0 .. self.height {
             for x in 0 .. self.width {
                 let index = (y * self.width + x) as usize;
                 let px = &self.data[index];
-                try!(bmp_data.write_all(&[px.b, px.g, px.r]));
+                try!(Write::write(bmp_data, &[px.b, px.g, px.r]));
             }
-            try!(bmp_data.write_all(padding));
+            try!(Write::write(bmp_data, padding));
         }
         Ok(())
     }
@@ -468,8 +480,10 @@ impl Image {
 /// });
 /// ```
 pub fn open(name: &str) -> BmpResult<Image> {
-    let mut f = try!(File::open_mode(&Path::new(name), Open, Read));
-    let mut bmp_data = MemReader::new(try!(f.read_to_end()));
+    let mut bytes = Vec::new();
+    let mut f = try!(fs::File::open(name));
+    try!(f.read_to_end(&mut bytes));
+    let mut bmp_data = Cursor::new(bytes);
 
     let id = try!(read_bmp_id(&mut bmp_data));
     let header = try!(read_bmp_header(&mut bmp_data));
@@ -483,8 +497,8 @@ pub fn open(name: &str) -> BmpResult<Image> {
 
     let data = match color_palette {
         Some(ref palette) => try!(
-            read_indexes(&mut bmp_data, &palette, width, height,
-                         dib_header.bits_per_pixel, header.pixel_offset)
+            read_indexes(&mut bmp_data.into_inner(), &palette, width as usize, height as usize,
+                         dib_header.bits_per_pixel, header.pixel_offset as usize)
         ),
         None => try!(
             read_pixels(&mut bmp_data, width, height, header.pixel_offset, padding as i64)
@@ -505,40 +519,41 @@ pub fn open(name: &str) -> BmpResult<Image> {
     Ok(image)
 }
 
-fn read_bmp_id(bmp_data: &mut MemReader) -> BmpResult<BmpId> {
-    let (m1, m2) = (try!(bmp_data.read_byte()), try!(bmp_data.read_byte()));
+fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpId> {
+    let mut bm = [0, 0];
+    try!(bmp_data.read(&mut bm));
 
-    match (m1, m2) {
-        (B, M) => Ok(BmpId::new()),
-        (m1, m2) => Err(BmpError::new(WrongMagicNumbers,
-                        format!("Expected '66 77', but was '{} {}'", m1, m2))),
+    if bm == b"BM" {
+        Ok(BmpId::new())
+    } else {
+        Err(BmpError::new(WrongMagicNumbers, format!("Expected [66, 77], but was {:?}", bm)))
     }
 }
 
-fn read_bmp_header(bmp_data: &mut MemReader) -> BmpResult<BmpHeader> {
+fn read_bmp_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpHeader> {
     let header = BmpHeader {
-        file_size:    try!(bmp_data.read_le_u32()),
-        creator1:     try!(bmp_data.read_le_u16()),
-        creator2:     try!(bmp_data.read_le_u16()),
-        pixel_offset: try!(bmp_data.read_le_u32())
+        file_size:    try!(bmp_data.read_u32::<LittleEndian>()),
+        creator1:     try!(bmp_data.read_u16::<LittleEndian>()),
+        creator2:     try!(bmp_data.read_u16::<LittleEndian>()),
+        pixel_offset: try!(bmp_data.read_u32::<LittleEndian>()),
     };
 
     Ok(header)
 }
 
-fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
+fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader> {
     let dib_header = BmpDibHeader {
-        header_size:    try!(bmp_data.read_le_u32()),
-        width:          try!(bmp_data.read_le_i32()),
-        height:         try!(bmp_data.read_le_i32()),
-        num_planes:     try!(bmp_data.read_le_u16()),
-        bits_per_pixel: try!(bmp_data.read_le_u16()),
-        compress_type:  try!(bmp_data.read_le_u32()),
-        data_size:      try!(bmp_data.read_le_u32()),
-        hres:           try!(bmp_data.read_le_i32()),
-        vres:           try!(bmp_data.read_le_i32()),
-        num_colors:     try!(bmp_data.read_le_u32()),
-        num_imp_colors: try!(bmp_data.read_le_u32()),
+        header_size:    try!(bmp_data.read_u32::<LittleEndian>()),
+        width:          try!(bmp_data.read_i32::<LittleEndian>()),
+        height:         try!(bmp_data.read_i32::<LittleEndian>()),
+        num_planes:     try!(bmp_data.read_u16::<LittleEndian>()),
+        bits_per_pixel: try!(bmp_data.read_u16::<LittleEndian>()),
+        compress_type:  try!(bmp_data.read_u32::<LittleEndian>()),
+        data_size:      try!(bmp_data.read_u32::<LittleEndian>()),
+        hres:           try!(bmp_data.read_i32::<LittleEndian>()),
+        vres:           try!(bmp_data.read_i32::<LittleEndian>()),
+        num_colors:     try!(bmp_data.read_u32::<LittleEndian>()),
+        num_imp_colors: try!(bmp_data.read_u32::<LittleEndian>()),
     };
 
     match dib_header.header_size {
@@ -567,7 +582,7 @@ fn read_bmp_dib_header(bmp_data: &mut MemReader) -> BmpResult<BmpDibHeader> {
     Ok(dib_header)
 }
 
-fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
+fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
                       BmpResult<Option<Vec<Pixel>>> {
     let num_entries = match dh.bits_per_pixel {
         // We have a color_palette if there if num_colors in the dib header is not zero
@@ -594,15 +609,19 @@ fn read_color_palette(bmp_data: &mut MemReader, dh: &BmpDibHeader) ->
     Ok(Some(color_palette))
 }
 
-fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
-                width: u32, height: u32, bpp: u16, offset: u32) -> BmpResult<Vec<Pixel>> {
-    let mut data = Vec::with_capacity((height * width) as usize);
+fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
+                width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<Pixel>> {
+    let mut data = Vec::with_capacity(height * width);
     // Number of bytes to read from each row, varies based on bits_per_pixel
     let bytes_per_row = Float::ceil(width as f64 / (8.0 / bpp as f64)) as usize;
-    // seek until data
-    try!(bmp_data.seek(offset as i64, SeekSet));
-    for _ in 0 .. height {
-        let bytes = try!(bmp_data.read_exact(bytes_per_row));
+    for y in 0 .. height {
+        let padding = match bytes_per_row % 4 {
+            0 => 0,
+            other => 4 - other
+        };
+        let start = offset + (bytes_per_row + padding) * y;
+        let bytes = &bmp_data[start .. start + bytes_per_row];
+
         // determine how to parse each row, depending on bits_per_pixel
         match bpp {
             1 => {
@@ -626,25 +645,21 @@ fn read_indexes(bmp_data: &mut MemReader, palette: &Vec<Pixel>,
             },
             8 => {
                 for index in bytes {
-                    data.push(palette[index as usize]);
+                    data.push(palette[*index as usize]);
                 }
             },
             other => return Err(BmpError::new(Other,
                 format!("BMP does not support color palettes for {} bits per pixel", other)))
         }
-        match bytes_per_row % 4 {
-            0 => (),
-            other => try!(bmp_data.seek(4 - other as i64, SeekCur))
-        }
     }
     Ok(data)
 }
 
-fn read_pixels(bmp_data: &mut MemReader, width: u32, height: u32,
+fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
                offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity((height * width) as usize);
     // seek until data
-    try!(bmp_data.seek(offset as i64, SeekSet));
+    try!(bmp_data.seek(SeekFrom::Start(offset as u64)));
     // read pixels until padding
     let mut px = [0; 3];
     for _ in 0 .. height {
@@ -653,7 +668,7 @@ fn read_pixels(bmp_data: &mut MemReader, width: u32, height: u32,
             data.push(px!(px[2], px[1], px[0]));
         }
         // seek padding
-        try!(bmp_data.seek(padding, SeekCur));
+        try!(bmp_data.seek(SeekFrom::Current(padding)));
     }
     Ok(data)
 }
