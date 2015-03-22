@@ -523,7 +523,7 @@ fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpId> {
     let mut bm = [0, 0];
     try!(bmp_data.read(&mut bm));
 
-    if bm == b"BM" {
+    if bm == b"BM"[..] {
         Ok(BmpId::new())
     } else {
         Err(BmpError::new(WrongMagicNumbers, format!("Expected [66, 77], but was {:?}", bm)))
