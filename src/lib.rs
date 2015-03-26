@@ -1,8 +1,11 @@
 #![crate_type = "lib"]
 #![warn(warnings)]
 #![feature(collections)]
-#![feature(core, io)]
+#![feature(convert)]
+#![feature(core)]
+#![feature(io)]
 #![cfg_attr(test, feature(test))]
+#![cfg_attr(test, feature(path_ext))]
 
 //! A small library for reading and writing BMP images.
 //!
@@ -38,6 +41,7 @@ extern crate byteorder;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::collections::BitVec;
+use std::convert::AsRef;
 use std::error::{Error, FromError};
 use std::fmt;
 use std::fs;
@@ -101,7 +105,7 @@ pub struct BmpError {
 }
 
 impl BmpError {
-    fn new<T: Str>(kind: BmpErrorKind, details: T) -> BmpError {
+    fn new<T: AsRef<str>>(kind: BmpErrorKind, details: T) -> BmpError {
         let description = match kind {
             WrongMagicNumbers => "Wrong magic numbers",
             UnsupportedBitsPerPixel => "Unsupported bits per pixel",
@@ -112,7 +116,7 @@ impl BmpError {
 
         BmpError {
             kind: kind,
-            details: format!("{}: {}", description, details.as_slice())
+            details: format!("{}: {}", description, details.as_ref())
         }
     }
 }
@@ -157,8 +161,8 @@ enum BmpVersion {
     Version4,
 }
 
-impl Str for BmpVersion {
-    fn as_slice(&self) -> &str {
+impl AsRef<str> for BmpVersion {
+    fn as_ref(&self) -> &str {
         match *self {
             Version1   => "BMP Version 1",
             Version2   => "BMP Version 2",
@@ -189,8 +193,8 @@ impl CompressionType {
     }
 }
 
-impl Str for CompressionType {
-    fn as_slice(&self) -> &str {
+impl AsRef<str> for CompressionType {
+    fn as_ref(&self) -> &str {
         match *self {
             Rle8bit           => "RLE 8-bit",
             Rle4bit           => "RLE 4-bit",
