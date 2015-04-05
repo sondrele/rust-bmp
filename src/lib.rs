@@ -681,7 +681,7 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
 ///
 /// It supports iteration over an image in row-major order,
 /// starting from in the upper left corner of the image.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub struct ImageIndex {
     width: u32,
     height: u32,
