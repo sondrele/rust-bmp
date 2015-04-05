@@ -41,8 +41,8 @@ extern crate byteorder;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::collections::BitVec;
-use std::convert::AsRef;
-use std::error::{Error, FromError};
+use std::convert::{From, AsRef};
+use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::num::Float;
@@ -130,14 +130,14 @@ impl fmt::Display for BmpError {
     }
 }
 
-impl FromError<io::Error> for BmpError {
-    fn from_error(err: io::Error) -> BmpError {
+impl From<io::Error> for BmpError {
+    fn from(err: io::Error) -> BmpError {
         BmpError::new(BmpIoError(err), "Io Error")
     }
 }
 
-impl FromError<byteorder::Error> for BmpError {
-    fn from_error(err: byteorder::Error) -> BmpError {
+impl From<byteorder::Error> for BmpError {
+    fn from(err: byteorder::Error) -> BmpError {
         BmpError::new(BmpByteorderError(err), "Byteorder Error")
     }
 }
