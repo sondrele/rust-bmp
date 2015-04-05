@@ -1,9 +1,6 @@
 #![crate_type = "lib"]
 #![warn(warnings)]
 #![feature(collections)]
-#![feature(convert)]
-#![feature(core)]
-#![feature(io)]
 #![cfg_attr(test, feature(test))]
 #![cfg_attr(test, feature(path_ext))]
 
@@ -45,8 +42,6 @@ use std::convert::{From, AsRef};
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::num::Float;
-use std::num::SignedInt;
 use std::io;
 use std::io::{Cursor, Read, Write, SeekFrom, Seek};
 use std::iter::Iterator;
@@ -617,7 +612,7 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
                 width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity(height * width);
     // Number of bytes to read from each row, varies based on bits_per_pixel
-    let bytes_per_row = Float::ceil(width as f64 / (8.0 / bpp as f64)) as usize;
+    let bytes_per_row = (width as f64 / (8.0 / bpp as f64)).ceil() as usize;
     for y in 0 .. height {
         let padding = match bytes_per_row % 4 {
             0 => 0,
