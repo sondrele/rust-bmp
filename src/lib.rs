@@ -86,7 +86,7 @@ pub mod consts;
 pub type BmpResult<T> = Result<T, BmpError>;
 
 /// The different kinds of possible BMP errors.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum BmpErrorKind {
     WrongMagicNumbers,
     UnsupportedBitsPerPixel,
@@ -98,7 +98,7 @@ pub enum BmpErrorKind {
 }
 
 /// The error type returned if the decoding of an image from disk fails.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct BmpError {
     pub kind: BmpErrorKind,
     pub details: String,
