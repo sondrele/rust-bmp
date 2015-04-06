@@ -1,9 +1,6 @@
 #![crate_type = "lib"]
 #![warn(warnings)]
 #![feature(collections)]
-#![feature(convert)]
-#![feature(core)]
-#![feature(io)]
 #![cfg_attr(test, feature(test))]
 #![cfg_attr(test, feature(path_ext))]
 
@@ -41,12 +38,10 @@ extern crate byteorder;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::collections::BitVec;
-use std::convert::AsRef;
-use std::error::{Error, FromError};
+use std::convert::{From, AsRef};
+use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::num::Float;
-use std::num::SignedInt;
 use std::io;
 use std::io::{Cursor, Read, Write, SeekFrom, Seek};
 use std::iter::Iterator;
@@ -86,7 +81,7 @@ pub mod consts;
 pub type BmpResult<T> = Result<T, BmpError>;
 
 /// The different kinds of possible BMP errors.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum BmpErrorKind {
     WrongMagicNumbers,
     UnsupportedBitsPerPixel,
@@ -98,7 +93,7 @@ pub enum BmpErrorKind {
 }
 
 /// The error type returned if the decoding of an image from disk fails.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct BmpError {
     pub kind: BmpErrorKind,
     pub details: String,
@@ -130,14 +125,14 @@ impl fmt::Display for BmpError {
     }
 }
 
-impl FromError<io::Error> for BmpError {
-    fn from_error(err: io::Error) -> BmpError {
+impl From<io::Error> for BmpError {
+    fn from(err: io::Error) -> BmpError {
         BmpError::new(BmpIoError(err), "Io Error")
     }
 }
 
-impl FromError<byteorder::Error> for BmpError {
-    fn from_error(err: byteorder::Error) -> BmpError {
+impl From<byteorder::Error> for BmpError {
+    fn from(err: byteorder::Error) -> BmpError {
         BmpError::new(BmpByteorderError(err), "Byteorder Error")
     }
 }
@@ -617,7 +612,7 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
                 width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity(height * width);
     // Number of bytes to read from each row, varies based on bits_per_pixel
-    let bytes_per_row = Float::ceil(width as f64 / (8.0 / bpp as f64)) as usize;
+    let bytes_per_row = (width as f64 / (8.0 / bpp as f64)).ceil() as usize;
     for y in 0 .. height {
         let padding = match bytes_per_row % 4 {
             0 => 0,
@@ -681,7 +676,7 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
 ///
 /// It supports iteration over an image in row-major order,
 /// starting from in the upper left corner of the image.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub struct ImageIndex {
     width: u32,
     height: u32,
