@@ -18,3 +18,4 @@ exclude = ["test"]
 
 [dependencies]
 byteorder = "0.3.5"
+cargo-watch = "2.1.3"
