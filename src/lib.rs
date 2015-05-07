@@ -35,7 +35,6 @@
 //!
 
 extern crate byteorder;
-use byteorder::{LittleEndian, WriteBytesExt};
 
 use std::convert::{AsRef};
 use std::error::Error;
@@ -74,10 +73,19 @@ macro_rules! px {
     }
 }
 
+macro_rules! file_size {
+    ($bpp:expr, $width:expr, $height:expr) => {{
+        let header_size = 2 + 12 + 40;
+        let row_size = (($bpp as f32 * $width as f32 + 31.0) / 32.0).floor() as u32 * 4;
+        (header_size as u32, $height as u32 * row_size)
+    }}
+}
+
 /// Common color constants accessible by names.
 pub mod consts;
 
 mod decoder;
+mod encoder;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
@@ -236,14 +244,6 @@ impl fmt::Debug for Image {
     }
 }
 
-macro_rules! file_size {
-    ($bpp:expr, $width:expr, $height:expr) => {{
-        let header_size = 2 + 12 + 40;
-        let row_size = (($bpp as f32 * $width as f32 + 31.0) / 32.0).floor() as u32 * 4;
-        (header_size as u32, $height as u32 * row_size)
-    }}
-}
-
 impl Image {
     /// Returns a new BMP Image with the `width` and `height` specified. It is initialized to
     /// a black image by default.
@@ -350,51 +350,9 @@ impl Image {
     /// ```
     pub fn save(&self, name: &str) -> io::Result<()> {
         // only 24 bpp encoding supported
-        let mut bmp_data = Vec::with_capacity(self.header.file_size as usize);
-        try!(self.write_header(&mut bmp_data));
-        try!(self.write_data(&mut bmp_data));
-
+        let bmp_data = try!(encoder::encode_image(self));
         let mut bmp_file = try!(fs::File::create(name));
         try!(bmp_file.write(&bmp_data));
-        Ok(())
-    }
-
-    fn write_header(&self, bmp_data: &mut Vec<u8>) -> io::Result<()> {
-        let header = &self.header;
-        let dib_header = &self.dib_header;
-        let (header_size, data_size) = file_size!(24, self.width, self.height);
-
-        try!(std::io::Write::write(bmp_data, &[B, M]));
-
-        try!(bmp_data.write_u32::<LittleEndian>(header_size + data_size));
-        try!(bmp_data.write_u16::<LittleEndian>(header.creator1));
-        try!(bmp_data.write_u16::<LittleEndian>(header.creator2));
-        try!(bmp_data.write_u32::<LittleEndian>(header_size)); // pixel_offset
-
-        try!(bmp_data.write_u32::<LittleEndian>(dib_header.header_size));
-        try!(bmp_data.write_i32::<LittleEndian>(dib_header.width));
-        try!(bmp_data.write_i32::<LittleEndian>(dib_header.height));
-        try!(bmp_data.write_u16::<LittleEndian>(1));  // num_planes
-        try!(bmp_data.write_u16::<LittleEndian>(24)); // bits_per_pixel
-        try!(bmp_data.write_u32::<LittleEndian>(0));  // compress_type
-        try!(bmp_data.write_u32::<LittleEndian>(data_size));
-        try!(bmp_data.write_i32::<LittleEndian>(dib_header.hres));
-        try!(bmp_data.write_i32::<LittleEndian>(dib_header.vres));
-        try!(bmp_data.write_u32::<LittleEndian>(0)); // num_colors
-        try!(bmp_data.write_u32::<LittleEndian>(0)); // num_imp_colors
-        Ok(())
-    }
-
-    fn write_data(&self, bmp_data: &mut Vec<u8>) -> io::Result<()> {
-        let padding = &[0; 4][0 .. self.padding as usize];
-        for y in 0 .. self.height {
-            for x in 0 .. self.width {
-                let index = (y * self.width + x) as usize;
-                let px = &self.data[index];
-                try!(Write::write(bmp_data, &[px.b, px.g, px.r]));
-            }
-            try!(Write::write(bmp_data, padding));
-        }
         Ok(())
     }
 }
