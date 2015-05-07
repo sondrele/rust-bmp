@@ -1,7 +1,7 @@
 [package]
 
 name = "bmp"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Sondre Lefsaker"]
 
 description = "Small library for reading and writing BMP images in Rust."
@@ -17,5 +17,4 @@ keywords = ["bmp", "image"]
 exclude = ["test"]
 
 [dependencies]
-byteorder = "0.3.5"
-
+byteorder = "0.3"
