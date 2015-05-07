@@ -1,4 +1,3 @@
-#![crate_type = "lib"]
 #![warn(warnings)]
 #![cfg_attr(test, feature(test))]
 #![cfg_attr(test, feature(path_ext))]
@@ -10,10 +9,10 @@
 //!
 //! |Scheme | Decoding | Encoding | Compression |
 //! |-------|----------|----------|-------------|
-//! | 24 bpp| ✓        | ✓       | No
-//! | 8 bpp | ✓        | ✗       | No
-//! | 4 bpp | ✓        | ✗       | No
-//! | 1 bpp | ✓        | ✗       | No
+//! | 24 bpp| ✓        | ✓        | No          |
+//! | 8 bpp | ✓        | ✗        | No          |
+//! | 4 bpp | ✓        | ✗        | No          |
+//! | 1 bpp | ✓        | ✗        | No          |
 //!
 //! # Example
 //!
