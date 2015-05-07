@@ -5,17 +5,16 @@ rust-bmp
 [Full documentation](http://sondrele.github.io/rust-bmp/bmp/index.html)
 
 Small module for reading and writing bitmap images.
-Currently only 24-bit RGB BMP images are supported.
+See the documentation for the current status of BMP encoding and decoding support.
 
 Usage
 -----
-The library should be available on [crates.io](https://crates.io/crates/bmp),
-but updated versions of the crate might lag behind until 1.0.0 of Rust has been released.
+An updated version of the library should be available on [crates.io](https://crates.io/crates/bmp).
+Add the following to your `Cargo.toml` to get is a dependency.
 
-To ensure that the crate is up to date, add it as a git dependency to `Cargo.toml` in your project.
 ```toml
-[dependencies.bmp]
-git = "https://github.com/sondrele/rust-bmp"
+[dependencies]
+bmp = "*"
 ```
 ###Initializing
 Initialize a new image with the `new` function, by specifying `width` and `height`.
@@ -59,7 +58,7 @@ fn main() {
     let mut img = Image::new(256, 256);
 
     for (x, y) in img.coordinates() {
-        img.set_pixel(x, y, px!(x - y / 255, y - x / 255, x + y / 255));
+        img.set_pixel(x, y, px!(x, y, 200));
     }
     let _ = img.save("img.bmp");
 }

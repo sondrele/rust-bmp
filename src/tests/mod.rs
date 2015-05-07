@@ -6,16 +6,14 @@ use std::io::{Read, Seek, SeekFrom};
 use std::mem::size_of;
 use std::path;
 
-use {open, BmpError, BmpErrorKind, BmpId, BmpHeader, BmpDibHeader, Image, Pixel};
+use {open, BmpError, BmpErrorKind, BmpHeader, BmpDibHeader, Image, Pixel};
 use consts;
 
 #[test]
 fn size_of_bmp_header_is_54_bytes() {
-    let bmp_magic_size = size_of::<BmpId>();
     let bmp_header_size = size_of::<BmpHeader>();
     let bmp_bip_header_size = size_of::<BmpDibHeader>();
 
-    assert_eq!(2,  bmp_magic_size);
     assert_eq!(12, bmp_header_size);
     assert_eq!(40, bmp_bip_header_size);
 }
@@ -36,18 +34,18 @@ fn verify_test_bmp_image(img: Image) {
     assert_eq!(0,  header.creator2);
 
     let dib_header = img.dib_header;
-    assert_eq!(54, header.pixel_offset);
-    assert_eq!(40,    dib_header.header_size);
-    assert_eq!(2,     dib_header.width);
-    assert_eq!(2,     dib_header.height);
-    assert_eq!(1,     dib_header.num_planes);
-    assert_eq!(24,    dib_header.bits_per_pixel);
-    assert_eq!(0,     dib_header.compress_type);
-    assert_eq!(16,    dib_header.data_size);
+    assert_eq!(54,   header.pixel_offset);
+    assert_eq!(40,   dib_header.header_size);
+    assert_eq!(2,    dib_header.width);
+    assert_eq!(2,    dib_header.height);
+    assert_eq!(1,    dib_header.num_planes);
+    assert_eq!(24,   dib_header.bits_per_pixel);
+    assert_eq!(0,    dib_header.compress_type);
+    assert_eq!(16,   dib_header.data_size);
     assert_eq!(1000, dib_header.hres);
     assert_eq!(1000, dib_header.vres);
-    assert_eq!(0,     dib_header.num_colors);
-    assert_eq!(0,     dib_header.num_imp_colors);
+    assert_eq!(0,    dib_header.num_colors);
+    assert_eq!(0,    dib_header.num_imp_colors);
 
     assert_eq!(2, img.padding);
 }
