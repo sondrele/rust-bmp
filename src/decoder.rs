@@ -2,7 +2,6 @@ extern crate byteorder;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use std::collections::BitVec;
 use std::convert::{From, AsRef};
 use std::error::Error;
 use std::fmt;
@@ -223,12 +222,9 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
         // determine how to parse each row, depending on bits_per_pixel
         match bpp {
             1 => {
-                let bits = BitVec::from_bytes(&bytes[..]);
                 for b in 0 .. width as usize {
-                    match bits[b] {
-                        true => data.push(palette[1]),
-                        false => data.push(palette[0])
-                    }
+                    let i = index(&bytes, b);
+                    data.push(palette[i as usize]);
                 }
             },
             4 => {
@@ -253,6 +249,16 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
     Ok(data)
 }
 
+const BITS: usize = 8;
+
+fn index(bytes: &[u8], i: usize) -> u8 {
+    let w = i / BITS;
+    let b = i % BITS;
+
+    (bytes[w] & (0x1 << (7 - b) as u8)) >> (7 - b)
+}
+
+
 fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
                offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity((height * width) as usize);
@@ -269,4 +275,27 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
         try!(bmp_data.seek(SeekFrom::Current(padding)));
     }
     Ok(data)
+}
+
+#[test]
+fn test_calculate_bit_index() {
+    let bytes = vec![0b1000_0001, 0b1111_0001];
+
+    assert_eq!(index(&bytes, 0), 1);
+    assert_eq!(index(&bytes, 1), 0);
+    assert_eq!(index(&bytes, 2), 0);
+    assert_eq!(index(&bytes, 3), 0);
+    assert_eq!(index(&bytes, 4), 0);
+    assert_eq!(index(&bytes, 5), 0);
+    assert_eq!(index(&bytes, 6), 0);
+    assert_eq!(index(&bytes, 7), 1);
+
+    assert_eq!(index(&bytes, 8), 1);
+    assert_eq!(index(&bytes, 9), 1);
+    assert_eq!(index(&bytes, 10), 1);
+    assert_eq!(index(&bytes, 11), 1);
+    assert_eq!(index(&bytes, 12), 0);
+    assert_eq!(index(&bytes, 13), 0);
+    assert_eq!(index(&bytes, 14), 0);
+    assert_eq!(index(&bytes, 15), 1);
 }

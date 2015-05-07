@@ -1,6 +1,5 @@
 #![crate_type = "lib"]
 #![warn(warnings)]
-#![feature(collections)]
 #![cfg_attr(test, feature(test))]
 #![cfg_attr(test, feature(path_ext))]
 
