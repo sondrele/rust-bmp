@@ -8,7 +8,7 @@ use std::error::Error;
 use std::fmt;
 use std::io::{self, Cursor, Read, Write, SeekFrom, Seek};
 
-use {BmpId, BmpHeader, BmpDibHeader, CompressionType, Image, Pixel};
+use {BmpHeader, BmpDibHeader, CompressionType, Image, Pixel};
 use BmpVersion::*;
 
 use self::BmpErrorKind::*;
@@ -84,7 +84,7 @@ impl Error for BmpError {
 }
 
 pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
-    let id = try!(read_bmp_id(bmp_data));
+    try!(read_bmp_id(bmp_data));
     let header = try!(read_bmp_header(bmp_data));
     let dib_header = try!(read_bmp_dib_header(bmp_data));
 
@@ -105,7 +105,6 @@ pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
     };
 
     let image = Image {
-        magic: id,
         header: header,
         dib_header: dib_header,
         color_palette: color_palette,
@@ -118,12 +117,12 @@ pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
     Ok(image)
 }
 
-fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpId> {
+fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<()> {
     let mut bm = [0, 0];
     try!(bmp_data.read(&mut bm));
 
     if bm == b"BM"[..] {
-        Ok(BmpId::new())
+        Ok(())
     } else {
         Err(BmpError::new(WrongMagicNumbers, format!("Expected [66, 77], but was {:?}", bm)))
     }

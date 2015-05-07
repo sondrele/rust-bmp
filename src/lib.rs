@@ -52,9 +52,6 @@ pub use decoder::{BmpError, BmpErrorKind, BmpResult};
 #[cfg(test)]
 mod tests;
 
-const B: u8 = 66;
-const M: u8 = 77;
-
 /// The pixel data used in the `Image`.
 ///
 /// It has three values for the `red`, `blue` and `green` color channels, respectively.
@@ -140,21 +137,6 @@ impl AsRef<str> for CompressionType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct BmpId {
-    magic1: u8,
-    magic2: u8
-}
-
-impl BmpId {
-    pub fn new() -> BmpId {
-        BmpId {
-            magic1: B,
-            magic2: M
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 struct BmpHeader {
     file_size: u32,
     creator1: u16,
@@ -220,7 +202,6 @@ impl BmpDibHeader {
 /// Currently, only uncompressed BMP images are supported.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Image {
-    magic: BmpId,
     header: BmpHeader,
     dib_header: BmpDibHeader,
     color_palette: Option<Vec<Pixel>>,
@@ -233,7 +214,6 @@ pub struct Image {
 impl fmt::Debug for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         try!(write!(f, "Image {}\n", '{'));
-        try!(write!(f, "\tmagic: {:?},\n", self.magic));
         try!(write!(f, "\theader: {:?},\n", self.header));
         try!(write!(f, "\tdib_header: {:?},\n", self.dib_header));
         try!(write!(f, "\tcolor_palette: {:?},\n", self.color_palette));
@@ -263,7 +243,6 @@ impl Image {
 
         let (header_size, data_size) = file_size!(24, width, height);
         Image {
-            magic: BmpId::new(),
             header: BmpHeader::new(header_size, data_size),
             dib_header: BmpDibHeader::new(width as i32, height as i32),
             color_palette: None,
