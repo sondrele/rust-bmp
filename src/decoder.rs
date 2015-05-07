@@ -219,45 +219,12 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
         let start = offset + (bytes_per_row + padding) * y;
         let bytes = &bmp_data[start .. start + bytes_per_row];
 
-        // determine how to parse each row, depending on bits_per_pixel
-        match bpp {
-            1 => {
-                for b in 0 .. width as usize {
-                    let i = index(&bytes, b);
-                    data.push(palette[i as usize]);
-                }
-            },
-            4 => {
-                let mut index = Vec::with_capacity(data.len() + 1);
-                for b in bytes {
-                    index.push((b >> 4));
-                    index.push((b & 0x0f));
-                }
-                for i in 0 .. width as usize {
-                    data.push(palette[index[i] as usize]);
-                }
-            },
-            8 => {
-                for index in bytes {
-                    data.push(palette[*index as usize]);
-                }
-            },
-            other => return Err(BmpError::new(Other,
-                format!("BMP does not support color palettes for {} bits per pixel", other)))
+        for i in bit_index(&bytes, bpp as usize, width as usize) {
+            data.push(palette[i]);
         }
     }
     Ok(data)
 }
-
-const BITS: usize = 8;
-
-fn index(bytes: &[u8], i: usize) -> u8 {
-    let w = i / BITS;
-    let b = i % BITS;
-
-    (bytes[w] & (0x1 << (7 - b) as u8)) >> (7 - b)
-}
-
 
 fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
                offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
@@ -277,25 +244,82 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
     Ok(data)
 }
 
+const BITS: usize = 8;
+
+#[derive(Debug)]
+struct BitIndex<'a> {
+    size: usize,
+    nbits: usize,
+    bits_left: usize,
+    mask: u8,
+    bytes: &'a [u8],
+    index: usize,
+}
+
+fn bit_index<'a>(bytes: &'a [u8], nbits: usize, size: usize) -> BitIndex {
+    let bits_left = BITS - nbits;
+    BitIndex {
+        size: size,
+        nbits: nbits,
+        bits_left: bits_left,
+        mask: (!0 as u8 >> bits_left),
+        bytes: bytes,
+        index: 0,
+    }
+}
+
+impl<'a> Iterator for BitIndex<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        let n = self.index / BITS;
+        let offset = self.bits_left - self.index % BITS;
+
+        self.index += self.nbits;
+
+        if self.size == 0 {
+            None
+        } else {
+            self.size -= 1;
+            self.bytes.get(n).map(|&block|
+                ((block & self.mask << offset) >> offset) as usize
+            )
+        }
+    }
+}
+
 #[test]
 fn test_calculate_bit_index() {
     let bytes = vec![0b1000_0001, 0b1111_0001];
 
-    assert_eq!(index(&bytes, 0), 1);
-    assert_eq!(index(&bytes, 1), 0);
-    assert_eq!(index(&bytes, 2), 0);
-    assert_eq!(index(&bytes, 3), 0);
-    assert_eq!(index(&bytes, 4), 0);
-    assert_eq!(index(&bytes, 5), 0);
-    assert_eq!(index(&bytes, 6), 0);
-    assert_eq!(index(&bytes, 7), 1);
+    let mut bi = bit_index(&bytes, 1, 15);
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(1));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), Some(0));
+    assert_eq!(bi.next(), None);
+    assert_eq!(bi.next(), None);
 
-    assert_eq!(index(&bytes, 8), 1);
-    assert_eq!(index(&bytes, 9), 1);
-    assert_eq!(index(&bytes, 10), 1);
-    assert_eq!(index(&bytes, 11), 1);
-    assert_eq!(index(&bytes, 12), 0);
-    assert_eq!(index(&bytes, 13), 0);
-    assert_eq!(index(&bytes, 14), 0);
-    assert_eq!(index(&bytes, 15), 1);
+    let mut bi = bit_index(&bytes, 4, 4);
+    assert_eq!(bi.next(), Some(0b1000));
+    assert_eq!(bi.next(), Some(0b0001));
+    assert_eq!(bi.next(), Some(0b1111));
+    assert_eq!(bi.next(), Some(0b0001));
+    assert_eq!(bi.next(), None);
+
+    let mut bi = bit_index(&bytes, 8, 2);
+    assert_eq!(bi.next(), Some(0b1000_0001));
+    assert_eq!(bi.next(), Some(0b1111_0001));
+    assert_eq!(bi.next(), None);
 }
