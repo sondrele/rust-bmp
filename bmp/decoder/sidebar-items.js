@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["BmpErrorKind","The different kinds of possible BMP errors."]],"struct":[["BmpError","The error type returned if the decoding of an image from disk fails."]],"type":[["BmpResult","A result type, either containing an `Image` or a `BmpError`."]]});

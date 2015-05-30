@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Image` struct in crate `bmp`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Image">
+
+    <title>bmp::Image - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='index.html'>bmp</a></p><script>window.sidebarCurrent = {name: 'Image', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>bmp</a>::<wbr><a class='struct' href=''>Image</a><wbr></span><span class='out-of-band'><span id='render-detail'>
+            <a id="collapse-all" href="#">[-]</a>&nbsp;<a id="expand-all" href="#">[+]</a>
+        </span><a id='src-5022' href='../src/bmp/lib.rs.html#201-209'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Image {
+    // some fields omitted
+}</pre><div class='docblock'><p>The image type provided by the library.</p>
+
+<p>It exposes functions to initialize or read BMP images from disk, common modification of pixel
+data, and saving to disk.</p>
+
+<p>The image is accessed in row-major order from top to bottom,
+where point (0, 0) is defined to be in the upper left corner of the image.</p>
+
+<p>Currently, only uncompressed BMP images are supported.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><a class='stability Unmarked' title='No stability level'></a><code>impl <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h3><div class='impl-items'><h4 id='method.new' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.new' class='fnname'>new</a>(width: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, height: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>) -&gt; <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h4>
+<div class='docblock'><p>Returns a new BMP Image with the <code>width</code> and <code>height</code> specified. It is initialized to
+a black image by default.</p>
+
+<h1 id="example" class='section-header'><a
+                           href="#example">Example</a></h1><pre id='rust-example-rendered' class='rust '>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>bmp</span>;
+
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>img</span> <span class='op'>=</span> <span class='ident'>bmp</span>::<span class='ident'>Image</span>::<span class='ident'>new</span>(<span class='number'>100</span>, <span class='number'>80</span>);
+</pre>
+</div><h4 id='method.get_width' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.get_width' class='fnname'>get_width</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a></code></h4>
+<div class='docblock'><p>Returns the <code>width</code> of the Image.</p>
+</div><h4 id='method.get_height' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.get_height' class='fnname'>get_height</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a></code></h4>
+<div class='docblock'><p>Returns the <code>height</code> of the Image.</p>
+</div><h4 id='method.set_pixel' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.set_pixel' class='fnname'>set_pixel</a>(&amp;mut self, x: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, y: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, val: <a class='struct' href='../bmp/struct.Pixel.html' title='bmp::Pixel'>Pixel</a>)</code></h4>
+<div class='docblock'><p>Set the pixel value at the position of <code>width</code> and <code>height</code>.</p>
+
+<h1 id="example" class='section-header'><a
+                           href="#example">Example</a></h1><pre id='rust-example-rendered' class='rust '>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>bmp</span>;
+
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>img</span> <span class='op'>=</span> <span class='ident'>bmp</span>::<span class='ident'>Image</span>::<span class='ident'>new</span>(<span class='number'>100</span>, <span class='number'>80</span>);
+<span class='ident'>img</span>.<span class='ident'>set_pixel</span>(<span class='number'>10</span>, <span class='number'>10</span>, <span class='ident'>bmp</span>::<span class='ident'>consts</span>::<span class='ident'>RED</span>);
+</pre>
+</div><h4 id='method.get_pixel' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.get_pixel' class='fnname'>get_pixel</a>(&amp;self, x: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>, y: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>) -&gt; <a class='struct' href='../bmp/struct.Pixel.html' title='bmp::Pixel'>Pixel</a></code></h4>
+<div class='docblock'><p>Returns the pixel value at the position of <code>width</code> and <code>height</code>.</p>
+
+<h1 id="example" class='section-header'><a
+                           href="#example">Example</a></h1><pre id='rust-example-rendered' class='rust '>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>bmp</span>;
+
+<span class='kw'>let</span> <span class='ident'>img</span> <span class='op'>=</span> <span class='ident'>bmp</span>::<span class='ident'>Image</span>::<span class='ident'>new</span>(<span class='number'>100</span>, <span class='number'>80</span>);
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>bmp</span>::<span class='ident'>consts</span>::<span class='ident'>BLACK</span>, <span class='ident'>img</span>.<span class='ident'>get_pixel</span>(<span class='number'>10</span>, <span class='number'>10</span>));
+</pre>
+</div><h4 id='method.coordinates' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.coordinates' class='fnname'>coordinates</a>(&amp;self) -&gt; <a class='struct' href='../bmp/struct.ImageIndex.html' title='bmp::ImageIndex'>ImageIndex</a></code></h4>
+<div class='docblock'><p>Returns a new <code>ImageIndex</code> that iterates over the image dimensions in top-bottom order.</p>
+
+<h1 id="example" class='section-header'><a
+                           href="#example">Example</a></h1><pre id='rust-example-rendered' class='rust '>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>bmp</span>;
+
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>img</span> <span class='op'>=</span> <span class='ident'>bmp</span>::<span class='ident'>Image</span>::<span class='ident'>new</span>(<span class='number'>100</span>, <span class='number'>100</span>);
+<span class='kw'>for</span> (<span class='ident'>x</span>, <span class='ident'>y</span>) <span class='kw'>in</span> <span class='ident'>img</span>.<span class='ident'>coordinates</span>() {
+    <span class='ident'>img</span>.<span class='ident'>set_pixel</span>(<span class='ident'>x</span>, <span class='ident'>y</span>, <span class='ident'>bmp</span>::<span class='ident'>consts</span>::<span class='ident'>BLUE</span>);
+}
+</pre>
+</div><h4 id='method.save' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.save' class='fnname'>save</a>(&amp;self, name: &amp;<a href='http://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Saves the image to the path specified by <code>name</code>. The function will overwrite the contents
+if a file already exists with the same name.</p>
+
+<p>The function returns the <code>io::Result</code> from the underlying <code>Reader</code>.</p>
+
+<h1 id="example" class='section-header'><a
+                           href="#example">Example</a></h1><pre id='rust-example-rendered' class='rust '>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>bmp</span>;
+
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>img</span> <span class='op'>=</span> <span class='ident'>bmp</span>::<span class='ident'>Image</span>::<span class='ident'>new</span>(<span class='number'>100</span>, <span class='number'>100</span>);
+<span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>img</span>.<span class='ident'>save</span>(<span class='string'>&quot;black.bmp&quot;</span>).<span class='ident'>unwrap_or_else</span>(<span class='op'>|</span><span class='ident'>e</span><span class='op'>|</span> {
+    <span class='macro'>panic</span><span class='macro'>!</span>(<span class='string'>&quot;Failed to save: {}&quot;</span>, <span class='ident'>e</span>)
+});
+</pre>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><a class='stability Stable' title='Stable'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='http://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, f: &amp;mut <a class='struct' href='http://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='struct' href='http://doc.rust-lang.org/nightly/core/fmt/struct.Error.html' title='core::fmt::Error'>Error</a>&gt;</code></h4>
+</div><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><a class='stability Stable' title='Stable'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a> for <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h3><div class='impl-items'><h4 id='method.eq' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.ne' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, __arg_0: &amp;<a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a>) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+</div><h3 class='impl'><a class='stability Stable' title='Stable'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> for <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h3><div class='impl-items'></div><h3 class='impl'><a class='stability Stable' title='Stable'></a><code>impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../bmp/struct.Image.html' title='bmp::Image'>Image</a></code></h4>
+<h4 id='method.clone_from' class='method'><a class='stability Stable' title='Stable'></a><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "bmp";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>
