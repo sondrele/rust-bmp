@@ -1,6 +1,5 @@
 #![warn(warnings)]
-#![cfg_attr(test, feature(test))]
-#![cfg_attr(test, feature(path_ext))]
+#![cfg_attr(test, deny(warnings))]
 
 //! A small library for reading and writing BMP images.
 //!

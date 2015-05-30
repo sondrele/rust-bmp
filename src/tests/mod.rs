@@ -1,10 +1,7 @@
-extern crate test;
-
 use std::fs;
-use std::fs::PathExt;
+// use std::fs::PathExt;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::size_of;
-use std::path;
 
 use {open, BmpError, BmpErrorKind, BmpHeader, BmpDibHeader, Image, Pixel};
 use consts;
@@ -18,14 +15,14 @@ fn size_of_bmp_header_is_54_bytes() {
     assert_eq!(40, bmp_bip_header_size);
 }
 
-#[test]
-fn size_of_4pixel_bmp_image_is_70_bytes() {
-    let path_wd = path::Path::new("test/rgbw.bmp");
-    match path_wd.metadata() {
-        Ok(stat) => assert_eq!(70, stat.len() as i32),
-        Err(_) => (/* Ignore IoError for now */)
-    }
-}
+// #[test]
+// fn size_of_4pixel_bmp_image_is_70_bytes() {
+//     let path_wd = path::Path::new("test/rgbw.bmp");
+//     match path_wd.metadata() {
+//         Ok(stat) => assert_eq!(70, stat.len() as i32),
+//         Err(_) => (/* Ignore IoError for now */)
+//     }
+// }
 
 fn verify_test_bmp_image(img: Image) {
     let header = img.header;
@@ -189,13 +186,14 @@ fn coordinates_iterator_gives_x_and_y_in_row_major_order() {
     assert_eq!(coords.next(), Some((1, 2)));
 }
 
-#[bench]
-fn write_bmp(b: &mut test::Bencher) {
-    let img = Image::new(320, 240);
-    b.iter(|| img.save("test/bench_test.bmp"));
-}
+// TODO: Add benches when they are considered stable
+// #[bench]
+// fn write_bmp(b: &mut test::Bencher) {
+//     let img = Image::new(320, 240);
+//     b.iter(|| img.save("test/bench_test.bmp"));
+// }
 
-#[bench]
-fn open_bmp(b: &mut test::Bencher) {
-    b.iter(|| open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp"));
-}
+// #[bench]
+// fn open_bmp(b: &mut test::Bencher) {
+//     b.iter(|| open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp"));
+// }
