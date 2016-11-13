@@ -24,7 +24,6 @@ pub enum BmpErrorKind {
     UnsupportedBmpVersion,
     Other,
     BmpIoError(io::Error),
-    BmpByteorderError(byteorder::Error),
 }
 
 /// The error type returned if the decoding of an image from disk fails.
@@ -66,17 +65,10 @@ impl From<io::Error> for BmpError {
     }
 }
 
-impl From<byteorder::Error> for BmpError {
-    fn from(err: byteorder::Error) -> BmpError {
-        BmpError::new(BmpByteorderError(err), "Byteorder Error")
-    }
-}
-
 impl Error for BmpError {
     fn description(&self) -> &str {
         match self.kind {
             BmpIoError(ref e) => Error::description(e),
-            BmpByteorderError(ref e) => Error::description(e),
             _ => &self.details
         }
     }
