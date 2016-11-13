@@ -58,6 +58,12 @@ pub struct Pixel {
     pub b: u8
 }
 
+impl Pixel {
+    pub fn new(r: u8, g: u8, b: u8) -> Pixel {
+        Pixel { r: r, g: g, b: b }
+    }
+}
+
 /// Macro to generate a `Pixel` from `r`, `g` and `b` values.
 #[macro_export]
 macro_rules! px {
