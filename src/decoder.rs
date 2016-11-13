@@ -5,7 +5,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::{From, AsRef};
 use std::error::Error;
 use std::fmt;
-use std::io::{self, Cursor, Read, Write, SeekFrom, Seek};
+use std::io::{self, Cursor, Read, SeekFrom, Seek};
 
 use {BmpHeader, BmpDibHeader, CompressionType, Image, Pixel};
 use BmpVersion::*;
@@ -83,24 +83,21 @@ impl Error for BmpError {
 }
 
 pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
-    try!(read_bmp_id(bmp_data));
-    let header = try!(read_bmp_header(bmp_data));
-    let dib_header = try!(read_bmp_dib_header(bmp_data));
+    read_bmp_id(bmp_data)?;
+    let header = read_bmp_header(bmp_data)?;
+    let dib_header = read_bmp_dib_header(bmp_data)?;
 
-    let color_palette = try!(read_color_palette(bmp_data, &dib_header));
+    let color_palette = read_color_palette(bmp_data, &dib_header)?;
 
     let width = dib_header.width.abs() as u32;
     let height = dib_header.height.abs() as u32;
     let padding = width % 4;
 
     let data = match color_palette {
-        Some(ref palette) => try!(
+        Some(ref palette) =>
             read_indexes(bmp_data.get_mut(), &palette, width as usize, height as usize,
-                         dib_header.bits_per_pixel, header.pixel_offset as usize)
-        ),
-        None => try!(
-            read_pixels(bmp_data, width, height, header.pixel_offset, padding as i64)
-        )
+                         dib_header.bits_per_pixel, header.pixel_offset as usize)?,
+        None => read_pixels(bmp_data, width, height, header.pixel_offset, padding as i64)?
     };
 
     let image = Image {
@@ -118,7 +115,7 @@ pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
 
 fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<()> {
     let mut bm = [0, 0];
-    try!(bmp_data.read(&mut bm));
+    bmp_data.read(&mut bm)?;
 
     if bm == b"BM"[..] {
         Ok(())
@@ -129,10 +126,10 @@ fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<()> {
 
 fn read_bmp_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpHeader> {
     let header = BmpHeader {
-        file_size:    try!(bmp_data.read_u32::<LittleEndian>()),
-        creator1:     try!(bmp_data.read_u16::<LittleEndian>()),
-        creator2:     try!(bmp_data.read_u16::<LittleEndian>()),
-        pixel_offset: try!(bmp_data.read_u32::<LittleEndian>()),
+        file_size:    bmp_data.read_u32::<LittleEndian>()?,
+        creator1:     bmp_data.read_u16::<LittleEndian>()?,
+        creator2:     bmp_data.read_u16::<LittleEndian>()?,
+        pixel_offset: bmp_data.read_u32::<LittleEndian>()?,
     };
 
     Ok(header)
@@ -140,17 +137,17 @@ fn read_bmp_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpHeader> {
 
 fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader> {
     let dib_header = BmpDibHeader {
-        header_size:    try!(bmp_data.read_u32::<LittleEndian>()),
-        width:          try!(bmp_data.read_i32::<LittleEndian>()),
-        height:         try!(bmp_data.read_i32::<LittleEndian>()),
-        num_planes:     try!(bmp_data.read_u16::<LittleEndian>()),
-        bits_per_pixel: try!(bmp_data.read_u16::<LittleEndian>()),
-        compress_type:  try!(bmp_data.read_u32::<LittleEndian>()),
-        data_size:      try!(bmp_data.read_u32::<LittleEndian>()),
-        hres:           try!(bmp_data.read_i32::<LittleEndian>()),
-        vres:           try!(bmp_data.read_i32::<LittleEndian>()),
-        num_colors:     try!(bmp_data.read_u32::<LittleEndian>()),
-        num_imp_colors: try!(bmp_data.read_u32::<LittleEndian>()),
+        header_size:    bmp_data.read_u32::<LittleEndian>()?,
+        width:          bmp_data.read_i32::<LittleEndian>()?,
+        height:         bmp_data.read_i32::<LittleEndian>()?,
+        num_planes:     bmp_data.read_u16::<LittleEndian>()?,
+        bits_per_pixel: bmp_data.read_u16::<LittleEndian>()?,
+        compress_type:  bmp_data.read_u32::<LittleEndian>()?,
+        data_size:      bmp_data.read_u32::<LittleEndian>()?,
+        hres:           bmp_data.read_i32::<LittleEndian>()?,
+        vres:           bmp_data.read_i32::<LittleEndian>()?,
+        num_colors:     bmp_data.read_u32::<LittleEndian>()?,
+        num_imp_colors: bmp_data.read_u32::<LittleEndian>()?,
     };
 
     match dib_header.header_size {
@@ -199,7 +196,7 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
     let mut px = &mut [0; 4][0 .. num_bytes as usize];
     let mut color_palette = Vec::with_capacity(num_entries);
     for _ in 0 .. num_entries {
-        try!(bmp_data.read(&mut px));
+        bmp_data.read(&mut px)?;
         color_palette.push(px!(px[2], px[1], px[0]));
     }
 
@@ -230,16 +227,16 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
                offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity((height * width) as usize);
     // seek until data
-    try!(bmp_data.seek(SeekFrom::Start(offset as u64)));
+    bmp_data.seek(SeekFrom::Start(offset as u64))?;
     // read pixels until padding
     let mut px = [0; 3];
     for _ in 0 .. height {
         for _ in 0 .. width {
-            try!(bmp_data.read(&mut px));
+            bmp_data.read(&mut px)?;
             data.push(px!(px[2], px[1], px[0]));
         }
         // seek padding
-        try!(bmp_data.seek(SeekFrom::Current(padding)));
+        bmp_data.seek(SeekFrom::Current(padding))?;
     }
     Ok(data)
 }

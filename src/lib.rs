@@ -34,7 +34,6 @@
 extern crate byteorder;
 
 use std::convert::{AsRef};
-use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::io;
@@ -81,6 +80,7 @@ pub mod consts;
 mod decoder;
 mod encoder;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
     Version1,
@@ -210,13 +210,13 @@ pub struct Image {
 
 impl fmt::Debug for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        try!(write!(f, "Image {}\n", '{'));
-        try!(write!(f, "\theader: {:?},\n", self.header));
-        try!(write!(f, "\tdib_header: {:?},\n", self.dib_header));
-        try!(write!(f, "\tcolor_palette: {:?},\n", self.color_palette));
-        try!(write!(f, "\twidth: {:?},\n", self.width));
-        try!(write!(f, "\theight: {:?},\n", self.height));
-        try!(write!(f, "\tpadding: {:?},\n", self.padding));
+        write!(f, "Image {}\n", '{')?;
+        write!(f, "\theader: {:?},\n", self.header)?;
+        write!(f, "\tdib_header: {:?},\n", self.dib_header)?;
+        write!(f, "\tcolor_palette: {:?},\n", self.color_palette)?;
+        write!(f, "\twidth: {:?},\n", self.width)?;
+        write!(f, "\theight: {:?},\n", self.height)?;
+        write!(f, "\tpadding: {:?},\n", self.padding)?;
         write!(f, "{}", '}')
     }
 }
@@ -326,9 +326,9 @@ impl Image {
     /// ```
     pub fn save(&self, name: &str) -> io::Result<()> {
         // only 24 bpp encoding supported
-        let bmp_data = try!(encoder::encode_image(self));
-        let mut bmp_file = try!(fs::File::create(name));
-        try!(bmp_file.write(&bmp_data));
+        let bmp_data = encoder::encode_image(self)?;
+        let mut bmp_file = fs::File::create(name)?;
+        bmp_file.write(&bmp_data)?;
         Ok(())
     }
 }
@@ -346,8 +346,8 @@ impl Image {
 /// ```
 pub fn open(name: &str) -> BmpResult<Image> {
     let mut bytes = Vec::new();
-    let mut f = try!(fs::File::open(name));
-    try!(f.read_to_end(&mut bytes));
+    let mut f = fs::File::open(name)?;
+    f.read_to_end(&mut bytes)?;
     let mut bmp_data = Cursor::new(bytes);
 
     decoder::decode_image(&mut bmp_data)
