@@ -55,6 +55,7 @@ macro_rules! px {
 macro_rules! file_size {
     ($bpp:expr, $width:expr, $height:expr) => {{
         let header_size = 2 + 12 + 40;
+        // find row size in bytes, round up to 4 bytes (padding)
         let row_size = (($bpp as f32 * $width as f32 + 31.0) / 32.0).floor() as u32 * 4;
         (header_size as u32, $height as u32 * row_size)
     }}
