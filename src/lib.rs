@@ -33,7 +33,7 @@
 
 extern crate byteorder;
 
-use std::convert::{AsRef};
+use std::convert::AsRef;
 use std::fmt;
 use std::fs;
 use std::io;
@@ -55,7 +55,7 @@ mod tests;
 pub struct Pixel {
     pub r: u8,
     pub g: u8,
-    pub b: u8
+    pub b: u8,
 }
 
 impl Pixel {
@@ -144,7 +144,7 @@ struct BmpHeader {
     file_size: u32,
     creator1: u16,
     creator2: u16,
-    pixel_offset: u32
+    pixel_offset: u32,
 }
 
 impl BmpHeader {
@@ -153,7 +153,7 @@ impl BmpHeader {
             file_size: header_size + data_size,
             creator1: 0 /* Unused */,
             creator2: 0 /* Unused */,
-            pixel_offset: header_size
+            pixel_offset: header_size,
         }
     }
 }
@@ -211,7 +211,7 @@ pub struct Image {
     width: u32,
     height: u32,
     padding: u32,
-    data: Vec<Pixel>
+    data: Vec<Pixel>,
 }
 
 impl fmt::Debug for Image {
@@ -391,7 +391,7 @@ impl Iterator for ImageIndex {
             self.x += 1;
             if self.x == self.width {
                 self.x = 0;
-                self.y += 1;
+                self.y += 1; // Overflow?
             }
             this
         } else {
