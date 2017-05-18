@@ -1,4 +1,4 @@
-#![warn(warnings)]
+#![deny(warnings)]
 #![cfg_attr(test, deny(warnings))]
 
 //! A small library for reading and writing BMP images.
@@ -40,9 +40,8 @@ use std::io;
 use std::io::{Cursor, Read, Write};
 use std::iter::Iterator;
 
-use ::CompressionType::*;
-
-pub use decoder::{BmpError, BmpErrorKind, BmpResult};
+// Expose decoder's public types, structs, and enums
+pub use decoder::*;
 
 /// Macro to generate a `Pixel` from `r`, `g` and `b` values.
 #[macro_export]
@@ -118,10 +117,10 @@ enum CompressionType {
 impl CompressionType {
     fn from_u32(val: u32) -> CompressionType {
         match val {
-            1 => Rle8bit,
-            2 => Rle4bit,
-            3 => BitfieldsEncoding,
-            _ => Uncompressed,
+            1 => CompressionType::Rle8bit,
+            2 => CompressionType::Rle4bit,
+            3 => CompressionType::BitfieldsEncoding,
+            _ => CompressionType::Uncompressed,
         }
     }
 }
@@ -129,10 +128,10 @@ impl CompressionType {
 impl AsRef<str> for CompressionType {
     fn as_ref(&self) -> &str {
         match *self {
-            Rle8bit           => "RLE 8-bit",
-            Rle4bit           => "RLE 4-bit",
-            BitfieldsEncoding => "Bitfields Encoding",
-            Uncompressed      => "Uncompressed",
+            CompressionType::Rle8bit           => "RLE 8-bit",
+            CompressionType::Rle4bit           => "RLE 4-bit",
+            CompressionType::BitfieldsEncoding => "Bitfields Encoding",
+            CompressionType::Uncompressed      => "Uncompressed",
         }
     }
 }
