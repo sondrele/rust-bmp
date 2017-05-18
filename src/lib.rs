@@ -61,7 +61,6 @@ macro_rules! file_size {
     }}
 }
 
-
 /// Common color constants accessible by names.
 pub mod consts;
 
@@ -147,7 +146,7 @@ struct BmpHeader {
 }
 
 impl BmpHeader {
-    pub fn new(header_size: u32, data_size: u32) -> BmpHeader {
+    fn new(header_size: u32, data_size: u32) -> BmpHeader {
         BmpHeader {
             file_size: header_size + data_size,
             creator1: 0 /* Unused */,
@@ -173,10 +172,8 @@ struct BmpDibHeader {
 }
 
 impl BmpDibHeader {
-    pub fn new(width: i32, height: i32) -> BmpDibHeader {
-        let row_size = ((24.0 * width as f32 + 31.0) / 32.0).floor() as u32 * 4;
-        let pixel_array_size = row_size * height as u32;
-
+    fn new(width: i32, height: i32) -> BmpDibHeader {
+        let (_, pixel_array_size) = file_size!(24.0, width, height);
         BmpDibHeader {
             header_size: 40,
             width: width,
@@ -401,13 +398,9 @@ pub fn open(name: &str) -> BmpResult<Image> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    // use std::fs::PathExt;
+    use super::*;
     use std::io::{Read, Seek, SeekFrom};
     use std::mem::size_of;
-
-    use {open, BmpError, BmpErrorKind, BmpHeader, BmpDibHeader, Image, Pixel};
-    use consts;
 
     #[test]
     fn size_of_bmp_header_is_54_bytes() {
