@@ -41,7 +41,6 @@ use std::io::{Cursor, Read, Write};
 use std::iter::Iterator;
 
 use ::CompressionType::*;
-use ::BmpVersion::*;
 
 pub use decoder::{BmpError, BmpErrorKind, BmpResult};
 
@@ -87,21 +86,21 @@ impl Pixel {
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
-    Version1,
-    Version2,
-    Version3,
-    Version3NT,
-    Version4,
+    One,
+    Two,
+    Three,
+    ThreeNT,
+    Four,
 }
 
 impl AsRef<str> for BmpVersion {
     fn as_ref(&self) -> &str {
         match *self {
-            Version1   => "BMP Version 1",
-            Version2   => "BMP Version 2",
-            Version3   => "BMP Version 3",
-            Version3NT => "BMP Version 3 NT",
-            Version4   => "BMP Version 4",
+            BmpVersion::One => "BMP Version 1",
+            BmpVersion::Two => "BMP Version 2",
+            BmpVersion::Three => "BMP Version 3",
+            BmpVersion::ThreeNT => "BMP Version 3 NT",
+            BmpVersion::Four => "BMP Version 4",
         }
     }
 }
