@@ -41,7 +41,7 @@ use std::io::{Cursor, Read, Write};
 use std::iter::Iterator;
 
 // Expose decoder's public types, structs, and enums
-pub use decoder::*;
+pub use decoder::{BmpError, BmpErrorKind, BmpResult};
 
 /// Macro to generate a `Pixel` from `r`, `g` and `b` values.
 #[macro_export]
@@ -366,7 +366,7 @@ impl Iterator for ImageIndex {
             self.x += 1;
             if self.x == self.width {
                 self.x = 0;
-                self.y += 1; // Overflow?
+                self.y += 1;
             }
             this
         } else {
