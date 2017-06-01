@@ -7,24 +7,12 @@ use std::error::Error;
 use std::fmt;
 use std::io::{self, Cursor, Read, SeekFrom, Seek};
 
-use {BmpHeader, BmpDibHeader, CompressionType, Image, Pixel};
-use BmpVersion::*;
-
+// Import structs/functions defined in lib.rs
+use super::*;
 use self::BmpErrorKind::*;
 
 /// A result type, either containing an `Image` or a `BmpError`.
 pub type BmpResult<T> = Result<T, BmpError>;
-
-/// The different kinds of possible BMP errors.
-#[derive(Debug)]
-pub enum BmpErrorKind {
-    WrongMagicNumbers,
-    UnsupportedBitsPerPixel,
-    UnsupportedCompressionType,
-    UnsupportedBmpVersion,
-    Other,
-    BmpIoError(io::Error),
-}
 
 /// The error type returned if the decoding of an image from disk fails.
 #[derive(Debug)]
@@ -35,17 +23,9 @@ pub struct BmpError {
 
 impl BmpError {
     fn new<T: AsRef<str>>(kind: BmpErrorKind, details: T) -> BmpError {
-        let description = match kind {
-            WrongMagicNumbers => "Wrong magic numbers",
-            UnsupportedBitsPerPixel => "Unsupported bits per pixel",
-            UnsupportedCompressionType => "Unsupported compression type",
-            UnsupportedBmpVersion => "Unsupported BMP version",
-            _ => "BMP Error",
-        };
-
         BmpError {
             kind: kind,
-            details: format!("{}: {}", description, details.as_ref())
+            details: String::from(details.as_ref()),
         }
     }
 }
@@ -53,8 +33,11 @@ impl BmpError {
 impl fmt::Display for BmpError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
-            BmpIoError(ref error) => return error.fmt(fmt),
-            _ => write!(fmt, "{}", self.description())
+            BmpIoError(ref error) => error.fmt(fmt),
+            ref e => {
+                let kind_desc: &str = e.as_ref();
+                write!(fmt, "{}: {}", kind_desc, self.description())
+            }
         }
     }
 }
@@ -68,8 +51,31 @@ impl From<io::Error> for BmpError {
 impl Error for BmpError {
     fn description(&self) -> &str {
         match self.kind {
-            BmpIoError(ref e) => Error::description(e),
+            BmpIoError(ref e) => e.description(),
             _ => &self.details
+        }
+    }
+}
+
+/// The different kinds of possible BMP errors.
+#[derive(Debug)]
+pub enum BmpErrorKind {
+    WrongMagicNumbers,
+    UnsupportedBitsPerPixel,
+    UnsupportedCompressionType,
+    UnsupportedBmpVersion,
+    Other,
+    BmpIoError(io::Error),
+}
+
+impl AsRef<str> for BmpErrorKind {
+    fn as_ref(&self) -> &str {
+        match *self {
+            WrongMagicNumbers => "Wrong magic numbers",
+            UnsupportedBitsPerPixel => "Unsupported bits per pixel",
+            UnsupportedCompressionType => "Unsupported compression type",
+            UnsupportedBmpVersion => "Unsupported BMP version",
+            _ => "BMP Error",
         }
     }
 }
@@ -112,7 +118,8 @@ fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<()> {
     if bm == b"BM"[..] {
         Ok(())
     } else {
-        Err(BmpError::new(WrongMagicNumbers, format!("Expected [66, 77], but was {:?}", bm)))
+        Err(BmpError::new(WrongMagicNumbers,
+            format!("Expected [66, 77], but was {:?}", bm)))
     }
 }
 
@@ -144,10 +151,10 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
 
     match dib_header.header_size {
         // BMPv2 has a header size of 12 bytes
-        12 => return Err(BmpError::new(UnsupportedBmpVersion, Version2)),
+        12 => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two)),
         // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
         40 if dib_header.compress_type == 3 =>
-            return Err(BmpError::new(UnsupportedBmpVersion, Version3NT)),
+            return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::ThreeNT)),
         // BMPv4 has more data in its header, it is currently ignored but we still try to parse it
         108 | _ => ()
     }
@@ -182,7 +189,7 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
         // Each entry in the color_palette is four bytes for Version 3 or 4
         40 | 108 => 4,
         // Three bytes for Version two. Though, this is currently not supported
-        _ => return Err(BmpError::new(UnsupportedBmpVersion, Version2))
+        _ => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two))
     };
 
     let mut px = &mut [0; 4][0 .. num_bytes as usize];

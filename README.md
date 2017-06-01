@@ -16,7 +16,7 @@ Add the following to your `Cargo.toml` to get is a dependency.
 [dependencies]
 bmp = "*"
 ```
-###Initializing
+### Initializing
 Initialize a new image with the `new` function, by specifying `width` and `height`.
 ```rust
 extern crate bmp;
@@ -24,7 +24,7 @@ use bmp::Image;
 
 let mut img = Image::new(100, 100);
 ```
-###Editing
+### Editing
 Edit image data using the `get_pixel` and `set_pixel` functions.
 Save an image with the `save` function, by specifying the `path`. The function returns
 an `IoResult` which indicates whether the save was successful or not.
@@ -33,7 +33,7 @@ let pixel = img.get_pixel(0, 0);
 img.set_pixel(50, 50, Pixel { r: 255, g: 255, b: 255 });
 let _ = img.save("path/to/img.bmp");
 ```
-###Opening
+### Opening
 Open an existing image with the `open` function, by specifying the `path`. The function
 returns a `BmpResult`, that contains either a `Image` or a `BmpError`.
 ```rust
@@ -47,8 +47,8 @@ Coordinate convention
 ---------------------
 The BMP images are accessed in row-major order, where point (0, 0) is defined to  be in the
 upper left corner of the image.
-Example
--------
+Example:
+
 ```rust
 #[macro_use]
 extern crate bmp;
