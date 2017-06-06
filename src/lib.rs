@@ -86,7 +86,6 @@ impl Pixel {
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
-    One,
     Two,
     Three,
     ThreeNT,
@@ -96,7 +95,6 @@ enum BmpVersion {
 impl AsRef<str> for BmpVersion {
     fn as_ref(&self) -> &str {
         match *self {
-            BmpVersion::One => "BMP Version 1",
             BmpVersion::Two => "BMP Version 2",
             BmpVersion::Three => "BMP Version 3",
             BmpVersion::ThreeNT => "BMP Version 3 NT",
@@ -305,15 +303,14 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::Image;
     ///
-    /// let mut img = bmp::Image::new(100, 100);
+    /// let mut img = Image::new(100, 100);
     /// let _ = img.save("black.bmp").unwrap_or_else(|e| {
     ///     panic!("Failed to save: {}", e)
     /// });
     /// ```
     pub fn save(&self, name: &str) -> io::Result<()> {
-        // only 24 bpp encoding supported
         let bmp_data = encoder::encode_image(self)?;
         let mut bmp_file = fs::File::create(name)?;
         bmp_file.write(&bmp_data)?;
@@ -349,8 +346,8 @@ pub struct ImageIndex {
 impl ImageIndex {
     fn new(width: u32, height: u32) -> ImageIndex {
         ImageIndex {
-            width: width,
-            height: height,
+            width,
+            height,
             x: 0,
             y: 0
         }
@@ -380,8 +377,6 @@ impl Iterator for ImageIndex {
 /// # Example
 ///
 /// ```
-/// extern crate bmp;
-///
 /// let img = bmp::open("test/rgbw.bmp").unwrap_or_else(|e| {
 ///    panic!("Failed to open: {}", e);
 /// });
@@ -409,15 +404,6 @@ mod tests {
         assert_eq!(12, bmp_header_size);
         assert_eq!(40, bmp_bip_header_size);
     }
-
-    // #[test]
-    // fn size_of_4pixel_bmp_image_is_70_bytes() {
-    //     let path_wd = path::Path::new("test/rgbw.bmp");
-    //     match path_wd.metadata() {
-    //         Ok(stat) => assert_eq!(70, stat.len() as i32),
-    //         Err(_) => (/* Ignore IoError for now */)
-    //     }
-    // }
 
     fn verify_test_bmp_image(img: Image) {
         let header = img.header;
