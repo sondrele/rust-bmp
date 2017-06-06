@@ -4,11 +4,13 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::{self, Write};
 
 use Image;
+use Pixel;
+use Color;
 
 const B: u8 = 66;
 const M: u8 = 77;
 
-pub fn encode_image(bmp_image: &Image) -> io::Result<Vec<u8>> {
+pub fn encode_image<T: Pixel>(bmp_image: &Image<T>) -> io::Result<Vec<u8>> {
     let mut bmp_data = Vec::with_capacity(bmp_image.header.file_size as usize);
 
     write_header(&mut bmp_data, bmp_image)?;
@@ -16,7 +18,7 @@ pub fn encode_image(bmp_image: &Image) -> io::Result<Vec<u8>> {
     Ok(bmp_data)
 }
 
-fn write_header(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
+fn write_header<T: Pixel>(bmp_data: &mut Vec<u8>, img: &Image<T>) -> io::Result<()> {
     let header = &img.header;
     let dib_header = &img.dib_header;
     let (header_size, data_size) = file_size!(24, img.width, img.height);
@@ -42,13 +44,13 @@ fn write_header(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
     Ok(())
 }
 
-fn write_data(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
+fn write_data<T: Pixel>(bmp_data: &mut Vec<u8>, img: &Image<T>) -> io::Result<()> {
     let padding = &[0; 4][0 .. img.padding as usize];
     for y in 0 .. img.height {
         for x in 0 .. img.width {
             let index = (y * img.width + x) as usize;
-            let px = &img.data[index];
-            Write::write(bmp_data, &[px.b, px.g, px.r])?;
+            let &Color { r, g, b } = &img.data[index].to_color();
+            Write::write(bmp_data, &[b, g, r])?;
         }
         Write::write(bmp_data, padding)?;
     }

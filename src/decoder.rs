@@ -83,7 +83,7 @@ impl AsRef<str> for BmpErrorKind {
     }
 }
 
-pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
+pub fn decode_image<T: Pixel>(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image<T>> {
     read_bmp_id(bmp_data)?;
     let header = read_bmp_header(bmp_data)?;
     let dib_header = read_bmp_dib_header(bmp_data)?;
@@ -200,14 +200,14 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
     let mut color_palette = Vec::with_capacity(num_entries);
     for _ in 0 .. num_entries {
         bmp_data.read(&mut px)?;
-        color_palette.push(px!(px[2], px[1], px[0]));
+        color_palette.push(Color::new(px[2], px[1], px[0]));
     }
 
     Ok(Some(color_palette))
 }
 
-fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
-                width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<Pixel>> {
+fn read_indexes<T: Pixel>(bmp_data: &mut Vec<u8>, palette: &Vec<Color>,
+                width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<T>> {
     let mut data = Vec::with_capacity(height * width);
     // Number of bytes to read from each row, varies based on bits_per_pixel
     let bytes_per_row = (width as f64 / (8.0 / bpp as f64)).ceil() as usize;
@@ -220,14 +220,14 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
         let bytes = &bmp_data[start .. start + bytes_per_row];
 
         for i in bit_index(&bytes, bpp as usize, width as usize) {
-            data.push(palette[i]);
+            data.push(T::from_color(palette[i]));
         }
     }
     Ok(data)
 }
 
-fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
-               offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
+fn read_pixels<T: Pixel>(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
+               offset: u32, padding: i64) -> BmpResult<Vec<T>> {
     let mut data = Vec::with_capacity((height * width) as usize);
     // seek until data
     bmp_data.seek(SeekFrom::Start(offset as u64))?;
@@ -236,7 +236,7 @@ fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
     for _ in 0 .. height {
         for _ in 0 .. width {
             bmp_data.read(&mut px)?;
-            data.push(px!(px[2], px[1], px[0]));
+            data.push(T::from_color(Color::new(px[2], px[1], px[0])));
         }
         // seek padding
         bmp_data.seek(SeekFrom::Current(padding))?;

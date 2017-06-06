@@ -18,7 +18,7 @@
 //! ```
 //! #[macro_use]
 //! extern crate bmp;
-//! use bmp::{Image, Pixel};
+//! use bmp::{Image, RGB};
 //!
 //! fn main() {
 //!     let mut img = Image::new(256, 256);
@@ -43,11 +43,11 @@ use std::iter::Iterator;
 // Expose decoder's public types, structs, and enums
 pub use decoder::{BmpError, BmpErrorKind, BmpResult};
 
-/// Macro to generate a `Pixel` from `r`, `g` and `b` values.
+/// Macro to generate a `RGB` from `r`, `g` and `b` values.
 #[macro_export]
 macro_rules! px {
     ($r:expr, $g:expr, $b:expr) => {
-        Pixel { r: $r as u8, g: $g as u8, b: $b as u8 }
+        RGB($r as u8, $g as u8, $b as u8)
     }
 }
 
@@ -66,26 +66,60 @@ pub mod consts;
 mod decoder;
 mod encoder;
 
-/// The pixel data used in the `Image`.
+/// The color data used for each pixel in the `Image`.
 ///
 /// It has three values for the `red`, `blue` and `green` color channels, respectively.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Pixel {
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Color {
     pub r: u8,
     pub g: u8,
     pub b: u8,
 }
 
-impl Pixel {
-    /// Creates a new `Pixel`.
-    pub fn new(r: u8, g: u8, b: u8) -> Pixel {
-        Pixel { r: r, g: g, b: b }
+impl Color {
+    /// Creates a new `Color`.
+    pub fn new(r: u8, g: u8, b: u8) -> Color {
+        Color { r, g, b }
+    }
+}
+
+pub trait Pixel : Clone + Copy + Default + Eq + PartialEq + fmt::Debug {
+    fn to_color(&self) -> Color;
+
+    fn from_color(Color) -> Self;
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GrayScale(pub u8);
+
+impl Pixel for GrayScale {
+    fn to_color(&self) -> Color {
+        Color::new(self.0, self.0, self.0)
+    }
+
+    fn from_color(color: Color) -> GrayScale {
+        let r = 0.299 * color.r as f64;
+        let g = 0.587 * color.g as f64;
+        let b = 0.114 * color.b as f64;
+        GrayScale((r + g + b) as u8)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct RGB(pub u8, pub u8, pub u8);
+
+impl Pixel for RGB {
+    fn to_color(&self) -> Color {
+        Color::new(self.0, self.1, self.2)
+    }
+
+    fn from_color(color: Color) -> RGB {
+        RGB(color.r, color.g, color.b)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
-    One,
     Two,
     Three,
     ThreeNT,
@@ -109,7 +143,6 @@ impl BmpVersion {
 impl AsRef<str> for BmpVersion {
     fn as_ref(&self) -> &str {
         match *self {
-            BmpVersion::One => "BMP Version 1",
             BmpVersion::Two => "BMP Version 2",
             BmpVersion::Three => "BMP Version 3",
             BmpVersion::ThreeNT => "BMP Version 3 NT",
@@ -213,42 +246,37 @@ impl BmpDibHeader {
 ///
 /// Currently, only uncompressed BMP images are supported.
 #[derive(Clone, Eq, PartialEq)]
-pub struct Image {
+pub struct Image<T: Pixel> {
     header: BmpHeader,
     dib_header: BmpDibHeader,
-    color_palette: Option<Vec<Pixel>>,
+    color_palette: Option<Vec<Color>>,
     width: u32,
     height: u32,
     padding: u32,
-    data: Vec<Pixel>,
+    data: Vec<T>,
 }
 
-impl Image {
+impl<T: Pixel> Image<T> {
     /// Returns a new BMP Image with the `width` and `height` specified. It is initialized to
     /// a black image by default.
     ///
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::{Image, RGB};
     ///
-    /// let mut img = bmp::Image::new(100, 80);
+    /// let mut img = Image::<RGB>::new(100, 80);
     /// ```
-    pub fn new(width: u32, height: u32) -> Image {
-        let mut data = Vec::with_capacity((width * height) as usize);
-        for _ in 0 .. width * height {
-            data.push(px!(0, 0, 0));
-        }
-
+    pub fn new(width: u32, height: u32) -> Image<T> {
         let (header_size, data_size) = file_size!(24, width, height);
         Image {
             header: BmpHeader::new(header_size, data_size),
             dib_header: BmpDibHeader::new(width as i32, height as i32),
             color_palette: None,
-            width: width,
-            height: height,
+            width,
+            height,
             padding: width % 4,
-            data: data
+            data: vec![T::default(); (width * height) as usize],
         }
     }
 
@@ -269,13 +297,13 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::{Image, consts};
     ///
-    /// let mut img = bmp::Image::new(100, 80);
-    /// img.set_pixel(10, 10, bmp::consts::RED);
+    /// let mut img = Image::new(100, 80);
+    /// img.set_pixel(10, 10, consts::RED);
     /// ```
     #[inline]
-    pub fn set_pixel(&mut self, x: u32, y: u32, val: Pixel) {
+    pub fn set_pixel(&mut self, x: u32, y: u32, val: T) {
         self.data[((self.height - y - 1) * self.width + x) as usize] = val;
     }
 
@@ -284,13 +312,13 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::{Image, consts};
     ///
-    /// let img = bmp::Image::new(100, 80);
-    /// assert_eq!(bmp::consts::BLACK, img.get_pixel(10, 10));
+    /// let img = Image::new(100, 80);
+    /// assert_eq!(consts::BLACK, img.get_pixel(10, 10));
     /// ```
     #[inline]
-    pub fn get_pixel(&self, x: u32, y: u32) -> Pixel {
+    pub fn get_pixel(&self, x: u32, y: u32) -> T {
         self.data[((self.height - y - 1) * self.width + x) as usize]
     }
 
@@ -299,11 +327,11 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::{Image, consts};
     ///
-    /// let mut img = bmp::Image::new(100, 100);
+    /// let mut img = Image::new(100, 100);
     /// for (x, y) in img.coordinates() {
-    ///     img.set_pixel(x, y, bmp::consts::BLUE);
+    ///     img.set_pixel(x, y, consts::BLUE);
     /// }
     /// ```
     #[inline]
@@ -319,15 +347,14 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::{Image, RGB};
     ///
-    /// let mut img = bmp::Image::new(100, 100);
+    /// let mut img = Image::<RGB>::new(100, 100);
     /// let _ = img.save("black.bmp").unwrap_or_else(|e| {
     ///     panic!("Failed to save: {}", e)
     /// });
     /// ```
     pub fn save(&self, name: &str) -> io::Result<()> {
-        // only 24 bpp encoding supported
         let bmp_data = encoder::encode_image(self)?;
         let mut bmp_file = fs::File::create(name)?;
         bmp_file.write(&bmp_data)?;
@@ -335,7 +362,7 @@ impl Image {
     }
 }
 
-impl fmt::Debug for Image {
+impl<T: Pixel> fmt::Debug for Image<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "Image {}\n", '{')?;
         write!(f, "\theader: {:?},\n", self.header)?;
@@ -363,8 +390,8 @@ pub struct ImageIndex {
 impl ImageIndex {
     fn new(width: u32, height: u32) -> ImageIndex {
         ImageIndex {
-            width: width,
-            height: height,
+            width,
+            height,
             x: 0,
             y: 0
         }
@@ -394,13 +421,13 @@ impl Iterator for ImageIndex {
 /// # Example
 ///
 /// ```
-/// extern crate bmp;
+/// use bmp::RGB;
 ///
-/// let img = bmp::open("test/rgbw.bmp").unwrap_or_else(|e| {
+/// let img = bmp::open::<RGB>("test/rgbw.bmp").unwrap_or_else(|e| {
 ///    panic!("Failed to open: {}", e);
 /// });
 /// ```
-pub fn open(name: &str) -> BmpResult<Image> {
+pub fn open<T: Pixel>(name: &str) -> BmpResult<Image<T>> {
     let mut bytes = Vec::new();
     let mut f = fs::File::open(name)?;
     f.read_to_end(&mut bytes)?;
@@ -433,7 +460,7 @@ mod tests {
     //     }
     // }
 
-    fn verify_test_bmp_image(img: Image) {
+    fn verify_test_bmp_image(img: Image<RGB>) {
         let header = img.header;
         assert_eq!(70, header.file_size);
         assert_eq!(0,  header.creator1);
@@ -470,12 +497,12 @@ mod tests {
         let mut px = [0; 3];
         f.read(&mut px).unwrap();
 
-        assert_eq!(Pixel {r: px[2], g: px[1], b: px[0] }, consts::BLUE);
+        assert_eq!(px!(px[2], px[1], px[0]), consts::BLUE);
     }
 
     #[test]
     fn can_read_entire_bmp_image() {
-        let bmp_img = open("test/rgbw.bmp").unwrap();
+        let bmp_img = open::<RGB>("test/rgbw.bmp").unwrap();
         assert_eq!(bmp_img.data.len(), 4);
 
         assert_eq!(bmp_img.get_pixel(0, 0), consts::RED);
@@ -486,42 +513,38 @@ mod tests {
 
     #[test]
     fn read_write_1pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/1bpp-1x1.bmp").unwrap();
+        let img = open::<RGB>("test/bmptestsuite-0.9/valid/1bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLACK);
 
         let _ = img.save("test/1bb-1x1.bmp");
-        let img = open("test/1bb-1x1.bmp").unwrap();
+        let img = open::<RGB>("test/1bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLACK);
     }
 
     #[test]
     fn read_write_4pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open::<RGB>("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/4bb-1x1.bmp");
-        let img = open("test/4bb-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open::<RGB>("test/4bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
     }
 
     #[test]
     fn read_write_8pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap_or_else(|e| {
+        let img = open::<RGB>("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap_or_else(|e| {
             panic!("{}", e);
         });
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/8bb-1x1.bmp");
-        let img = open("test/8bb-1x1.bmp").unwrap_or_else(|e| {
+        let img = open::<RGB>("test/8bb-1x1.bmp").unwrap_or_else(|e| {
             panic!("{}", e);
         });
         assert_eq!(img.data.len(), 1);
@@ -530,7 +553,7 @@ mod tests {
 
     #[test]
     fn error_when_opening_unexisting_image() {
-        let result = open("test/no_img.bmp");
+        let result = open::<RGB>("test/no_img.bmp");
         match result {
             Err(BmpError{ kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
             _ => panic!("Ghost image!?")
@@ -539,7 +562,7 @@ mod tests {
 
     #[test]
     fn error_when_opening_image_with_wrong_bits_per_pixel() {
-        let result = open("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
+        let result = open::<RGB>("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::UnsupportedBitsPerPixel, .. }) => (/* Expected */),
             _ => panic!("32bpp should not be supported")
@@ -548,7 +571,7 @@ mod tests {
 
     #[test]
     fn error_when_opening_image_with_wrong_magic_numbers() {
-        let result = open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
+        let result = open::<RGB>("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::WrongMagicNumbers, .. }) => (/* Expected */),
             _ => panic!("Wrong magic numbers should not be supported")
@@ -564,7 +587,7 @@ mod tests {
         bmp.set_pixel(1, 1, consts::WHITE);
         let _ = bmp.save("test/rgbw_test.bmp");
 
-        let bmp_img = open("test/rgbw_test.bmp").unwrap();
+        let bmp_img = open::<RGB>("test/rgbw_test.bmp").unwrap();
         assert_eq!(bmp_img.get_pixel(0, 0), consts::RED);
         assert_eq!(bmp_img.get_pixel(1, 0), consts::LIME);
         assert_eq!(bmp_img.get_pixel(0, 1), consts::BLUE);
@@ -585,7 +608,7 @@ mod tests {
 
     #[test]
     fn coordinates_iterator_gives_x_and_y_in_row_major_order() {
-        let img = Image::new(2, 3);
+        let img = Image::<RGB>::new(2, 3);
         let mut coords = img.coordinates();
         assert_eq!(coords.next(), Some((0, 0)));
         assert_eq!(coords.next(), Some((1, 0)));

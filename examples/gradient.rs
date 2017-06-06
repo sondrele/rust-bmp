@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate bmp;
-use bmp::{Image, Pixel};
+use bmp::{Image, RGB};
 
 fn main() {
     let mut img = Image::new(256, 256);
