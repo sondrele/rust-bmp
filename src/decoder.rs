@@ -99,13 +99,13 @@ pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
     };
 
     let image = Image {
-        header: header,
-        dib_header: dib_header,
-        color_palette: color_palette,
-        width: width,
-        height: height,
-        padding: padding,
-        data: data
+        header,
+        dib_header: BmpDibHeader::new(width as i32, height as i32),
+        color_palette,
+        width,
+        height,
+        padding,
+        data,
     };
 
     Ok(image)
@@ -155,16 +155,21 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
         // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
         40 if dib_header.compress_type == 3 =>
             return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::ThreeNT)),
-        // BMPv4 has more data in its header, it is currently ignored but we still try to parse it
-        108 | _ => ()
+        // BMPv3 has 4o bytes in its header
+        // It is the only version that is "fully" supported (decompressed images are the exception)
+        40 => (),
+        // BMPv4 has has 108 bytes in its header, and BMPv5 has 124
+        // We will attempt to decode v4 and v5, but we ignore all the additional data in the header.
+        // This should not impose a big problem because neither decompression, nor 16 and 32-bit images are supported,
+        // so the decoding will likely fail due to these constraints either way.
+        108 | 124 => (),
+        other => return Err(BmpError::new(BmpErrorKind::Other, format!("Invalid header size: {} bytes", other))),
     }
 
     match dib_header.bits_per_pixel {
         // Currently supported
         1 | 4 | 8 | 24 => (),
-        other => return Err(
-            BmpError::new(UnsupportedBitsPerPixel, format!("{}", other))
-        )
+        other => return Err(BmpError::new(UnsupportedBitsPerPixel, format!("{}", other)))
     }
 
     match CompressionType::from_u32(dib_header.compress_type) {
@@ -176,9 +181,9 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
 }
 
 fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
-                      BmpResult<Option<Vec<Pixel>>> {
+                      BmpResult<Option<Vec<Color>>> {
     let num_entries = match dh.bits_per_pixel {
-        // We have a color_palette if there if num_colors in the dib header is not zero
+        // We have a color_palette if the num_colors in the dib header is not zero
         _ if dh.num_colors != 0 => dh.num_colors as usize,
         // Or if there are 8 or less bits per pixel
         bpp @ 1 | bpp @ 4 | bpp @ 8 => 1 << bpp,
@@ -186,11 +191,13 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
     };
 
     let num_bytes = match dh.header_size {
-        // Each entry in the color_palette is four bytes for Version 3 or 4
-        40 | 108 => 4,
+        // Each entry in the color_palette is four bytes for version 3 or 4
+        40 | 108 | 124 => 4,
         // Three bytes for Version two. Though, this is currently not supported
         _ => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two))
     };
+
+    bmp_data.seek(SeekFrom::Start(14 + dh.header_size as u64))?;
 
     let mut px = &mut [0; 4][0 .. num_bytes as usize];
     let mut color_palette = Vec::with_capacity(num_entries);
@@ -255,11 +262,11 @@ struct BitIndex<'a> {
 fn bit_index<'a>(bytes: &'a [u8], nbits: usize, size: usize) -> BitIndex {
     let bits_left = BITS - nbits;
     BitIndex {
-        size: size,
-        nbits: nbits,
-        bits_left: bits_left,
+        size,
+        nbits,
+        bits_left,
         mask: (!0 as u8 >> bits_left),
-        bytes: bytes,
+        bytes,
         index: 0,
     }
 }
