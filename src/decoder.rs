@@ -7,6 +7,9 @@ use std::error::Error;
 use std::fmt;
 use std::io::{self, Cursor, Read, SeekFrom, Seek};
 
+// The BmpHeader always has a size of 14 bytes
+const BMP_HEADER_SIZE: u64 = 14;
+
 // Import structs/functions defined in lib.rs
 use super::*;
 use self::BmpErrorKind::*;
@@ -191,7 +194,7 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
         _ => 4,
     };
 
-    bmp_data.seek(SeekFrom::Start(14 + dh.header_size as u64))?;
+    bmp_data.seek(SeekFrom::Start(BMP_HEADER_SIZE + dh.header_size as u64))?;
 
     let mut px = &mut [0; 4][0 .. num_bytes as usize];
     let mut color_palette = Vec::with_capacity(num_entries);
