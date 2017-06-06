@@ -83,13 +83,26 @@ impl Pixel {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
     Two,
     Three,
     ThreeNT,
     Four,
+    Five,
+}
+
+impl BmpVersion {
+    fn from_dib_header(dib_header: &BmpDibHeader) -> Option<BmpVersion> {
+        match dib_header.header_size {
+            12 => Some(BmpVersion::Two),
+            40 if dib_header.compress_type == 3 => Some(BmpVersion::ThreeNT),
+            40 => Some(BmpVersion::Three),
+            108 => Some(BmpVersion::Four),
+            124 => Some(BmpVersion::Five),
+            _ => None,
+        }
+    }
 }
 
 impl AsRef<str> for BmpVersion {
@@ -99,6 +112,7 @@ impl AsRef<str> for BmpVersion {
             BmpVersion::Three => "BMP Version 3",
             BmpVersion::ThreeNT => "BMP Version 3 NT",
             BmpVersion::Four => "BMP Version 4",
+            BmpVersion::Five => "BMP Version 5",
         }
     }
 }
