@@ -149,21 +149,15 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
         num_imp_colors: bmp_data.read_u32::<LittleEndian>()?,
     };
 
-    match dib_header.header_size {
-        // BMPv2 has a header size of 12 bytes
-        12 => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two)),
-        // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
-        40 if dib_header.compress_type == 3 =>
-            return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::ThreeNT)),
-        // BMPv3 has 4o bytes in its header
-        // It is the only version that is "fully" supported (decompressed images are the exception)
-        40 => (),
-        // BMPv4 has has 108 bytes in its header, and BMPv5 has 124
-        // We will attempt to decode v4 and v5, but we ignore all the additional data in the header.
+    match BmpVersion::from_dib_header(&dib_header) {
+        // V3 is the only version that is "fully" supported (decompressed images are the exception)
+        // We will also attempt to decode v4 and v5, but we ignore all the additional data in the header.
         // This should not impose a big problem because neither decompression, nor 16 and 32-bit images are supported,
         // so the decoding will likely fail due to these constraints either way.
-        108 | 124 => (),
-        other => return Err(BmpError::new(BmpErrorKind::Other, format!("Invalid header size: {} bytes", other))),
+        Some(BmpVersion::Three) | Some(BmpVersion::Four) | Some(BmpVersion::Five) => (),
+        // Otherwise, report the errors
+        Some(other) => return Err(BmpError::new(UnsupportedBmpVersion, other)),
+        None => return Err(BmpError::new(BmpErrorKind::Other, format!("Invalid dib header: {:?}", dib_header))),
     }
 
     match dib_header.bits_per_pixel {
@@ -190,11 +184,11 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
         _ => return Ok(None)
     };
 
-    let num_bytes = match dh.header_size {
-        // Each entry in the color_palette is four bytes for version 3 or 4
-        40 | 108 | 124 => 4,
-        // Three bytes for Version two. Though, this is currently not supported
-        _ => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two))
+    let num_bytes = match BmpVersion::from_dib_header(&dh) {
+        // Three bytes for v2. Though, this is currently not supported
+        Some(BmpVersion::Two) => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two)),
+        // Each entry in the color_palette is four bytes for v3, v4, and v5
+        _ => 4,
     };
 
     bmp_data.seek(SeekFrom::Start(14 + dh.header_size as u64))?;
