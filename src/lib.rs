@@ -94,7 +94,10 @@ pub struct GrayScale(pub u8);
 
 impl Pixel for GrayScale {
     fn to_color(&self) -> Color {
-        Color::new(self.0, self.0, self.0)
+        let r = (0.299) * self.0 as f64;
+        let g = (0.587) * self.0 as f64;
+        let b = (0.114) * self.0 as f64;
+        Color::new(r as u8, g as u8, b as u8)
     }
 
     fn from_color(color: Color) -> GrayScale {
@@ -451,14 +454,28 @@ mod tests {
         assert_eq!(40, bmp_bip_header_size);
     }
 
-    // #[test]
-    // fn size_of_4pixel_bmp_image_is_70_bytes() {
-    //     let path_wd = path::Path::new("test/rgbw.bmp");
-    //     match path_wd.metadata() {
-    //         Ok(stat) => assert_eq!(70, stat.len() as i32),
-    //         Err(_) => (/* Ignore IoError for now */)
-    //     }
-    // }
+    #[test]
+    fn should_convert_between_rgb_and_luma() {
+        let a = GrayScale::from_color(Color::new(205, 92, 92));
+        assert_eq!(a.0, 125);
+
+        assert_eq!(a.to_color(), Color::new(205, 92, 92));
+    }
+// #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+// pub struct GrayScale(pub u8);
+
+// impl Pixel for GrayScale {
+//     fn to_color(&self) -> Color {
+//         Color::new(self.0, self.0, self.0)
+//     }
+
+//     fn from_color(color: Color) -> GrayScale {
+//         let r = 0.299 * color.r as f64;
+//         let g = 0.587 * color.g as f64;
+//         let b = 0.114 * color.b as f64;
+//         GrayScale((r + g + b) as u8)
+//     }
+// }
 
     fn verify_test_bmp_image(img: Image<RGB>) {
         let header = img.header;
