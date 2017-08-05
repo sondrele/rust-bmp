@@ -140,10 +140,10 @@ impl CompressionType {
 impl AsRef<str> for CompressionType {
     fn as_ref(&self) -> &str {
         match *self {
-            CompressionType::Rle8bit           => "RLE 8-bit",
-            CompressionType::Rle4bit           => "RLE 4-bit",
+            CompressionType::Rle8bit => "RLE 8-bit",
+            CompressionType::Rle4bit => "RLE 4-bit",
             CompressionType::BitfieldsEncoding => "Bitfields Encoding",
-            CompressionType::Uncompressed      => "Uncompressed",
+            CompressionType::Uncompressed => "Uncompressed",
         }
     }
 }
@@ -160,8 +160,8 @@ impl BmpHeader {
     fn new(header_size: u32, data_size: u32) -> BmpHeader {
         BmpHeader {
             file_size: header_size + data_size,
-            creator1: 0 /* Unused */,
-            creator2: 0 /* Unused */,
+            creator1: 0, /* Unused */
+            creator2: 0, /* Unused */
             pixel_offset: header_size,
         }
     }
@@ -196,7 +196,7 @@ impl BmpDibHeader {
             hres: 1000,
             vres: 1000,
             num_colors: 0,
-            num_imp_colors: 0
+            num_imp_colors: 0,
         }
     }
 }
@@ -232,7 +232,7 @@ impl Image {
     /// ```
     pub fn new(width: u32, height: u32) -> Image {
         let mut data = Vec::with_capacity((width * height) as usize);
-        for _ in 0 .. width * height {
+        for _ in 0..width * height {
             data.push(px!(0, 0, 0));
         }
 
@@ -244,7 +244,7 @@ impl Image {
             width: width,
             height: height,
             padding: width % 4,
-            data: data
+            data: data,
         }
     }
 
@@ -346,7 +346,7 @@ pub struct ImageIndex {
     width: u32,
     height: u32,
     x: u32,
-    y: u32
+    y: u32,
 }
 
 impl ImageIndex {
@@ -355,7 +355,7 @@ impl ImageIndex {
             width,
             height,
             x: 0,
-            y: 0
+            y: 0,
         }
     }
 }
@@ -414,22 +414,22 @@ mod tests {
     fn verify_test_bmp_image(img: Image) {
         let header = img.header;
         assert_eq!(70, header.file_size);
-        assert_eq!(0,  header.creator1);
-        assert_eq!(0,  header.creator2);
+        assert_eq!(0, header.creator1);
+        assert_eq!(0, header.creator2);
 
         let dib_header = img.dib_header;
-        assert_eq!(54,   header.pixel_offset);
-        assert_eq!(40,   dib_header.header_size);
-        assert_eq!(2,    dib_header.width);
-        assert_eq!(2,    dib_header.height);
-        assert_eq!(1,    dib_header.num_planes);
-        assert_eq!(24,   dib_header.bits_per_pixel);
-        assert_eq!(0,    dib_header.compress_type);
-        assert_eq!(16,   dib_header.data_size);
+        assert_eq!(54, header.pixel_offset);
+        assert_eq!(40, dib_header.header_size);
+        assert_eq!(2, dib_header.width);
+        assert_eq!(2, dib_header.height);
+        assert_eq!(1, dib_header.num_planes);
+        assert_eq!(24, dib_header.bits_per_pixel);
+        assert_eq!(0, dib_header.compress_type);
+        assert_eq!(16, dib_header.data_size);
         assert_eq!(1000, dib_header.hres);
         assert_eq!(1000, dib_header.vres);
-        assert_eq!(0,    dib_header.num_colors);
-        assert_eq!(0,    dib_header.num_imp_colors);
+        assert_eq!(0, dib_header.num_colors);
+        assert_eq!(0, dib_header.num_imp_colors);
 
         assert_eq!(2, img.padding);
     }
@@ -448,7 +448,14 @@ mod tests {
         let mut px = [0; 3];
         f.read(&mut px).unwrap();
 
-        assert_eq!(Pixel {r: px[2], g: px[1], b: px[0] }, consts::BLUE);
+        assert_eq!(
+            Pixel {
+                r: px[2],
+                g: px[1],
+                b: px[0],
+            },
+            consts::BLUE
+        );
     }
 
     #[test]
@@ -520,8 +527,8 @@ mod tests {
     fn error_when_opening_unexisting_image() {
         let result = open("test/no_img.bmp");
         match result {
-            Err(BmpError{ kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
-            _ => panic!("No image expected...")
+            Err(BmpError { kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
+            _ => panic!("No image expected..."),
         }
     }
 
@@ -530,7 +537,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::UnsupportedBitsPerPixel, .. }) => (/* Expected */),
-            _ => panic!("32bpp are not yet supported")
+            _ => panic!("32bpp are not yet supported"),
         }
     }
 
@@ -539,7 +546,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::WrongMagicNumbers, .. }) => (/* Expected */),
-            _ => panic!("Wrong magic numbers are not supported")
+            _ => panic!("Wrong magic numbers are not supported"),
         }
     }
 
