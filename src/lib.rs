@@ -507,11 +507,23 @@ mod tests {
     }
 
     #[test]
+    fn read_bmp_v4_image() {
+        let bmp_img = open("test/bmpsuite-2.5/g/pal8v4.bmp").unwrap();
+        bmp_img.save("test/pal8v4-test.bmp").unwrap();
+    }
+
+    #[test]
+    fn read_bmp_v5_image() {
+        let bmp_img = open("test/bmpsuite-2.5/g/pal8v5.bmp").unwrap();
+        bmp_img.save("test/pal8v5-test.bmp").unwrap();
+    }
+
+    #[test]
     fn error_when_opening_unexisting_image() {
         let result = open("test/no_img.bmp");
         match result {
             Err(BmpError{ kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
-            _ => panic!("Ghost image!?")
+            _ => panic!("No image expected...")
         }
     }
 
@@ -520,7 +532,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::UnsupportedBitsPerPixel, .. }) => (/* Expected */),
-            _ => panic!("32bpp should not be supported")
+            _ => panic!("32bpp are not yet supported")
         }
     }
 
@@ -529,7 +541,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::WrongMagicNumbers, .. }) => (/* Expected */),
-            _ => panic!("Wrong magic numbers should not be supported")
+            _ => panic!("Wrong magic numbers are not supported")
         }
     }
 
