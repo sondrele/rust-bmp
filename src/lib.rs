@@ -38,6 +38,7 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::io::{Cursor, Read, Write};
+use std::path::Path;
 use std::iter::Iterator;
 
 // Expose decoder's public types, structs, and enums
@@ -184,7 +185,7 @@ struct BmpDibHeader {
 
 impl BmpDibHeader {
     fn new(width: i32, height: i32) -> BmpDibHeader {
-        let (_, pixel_array_size) = file_size!(24.0, width, height);
+        let (_, pixel_array_size) = file_size!(24, width, height);
         BmpDibHeader {
             header_size: 40,
             width: width,
@@ -301,10 +302,10 @@ impl Image {
         ImageIndex::new(self.width as u32, self.height as u32)
     }
 
-    /// Saves the image to the path specified by `name`. The function will overwrite the contents
-    /// if a file already exists with the same name.
+    /// Saves the `Image` instance to the path specified by `path`.
+    /// The function will overwrite the contents if a file already exists at the given path.
     ///
-    /// The function returns the `io::Result` from the underlying `Reader`.
+    /// The function returns the `io::Result` from the underlying writer.
     ///
     /// # Example
     ///
@@ -316,10 +317,15 @@ impl Image {
     ///     panic!("Failed to save: {}", e)
     /// });
     /// ```
-    pub fn save(&self, name: &str) -> io::Result<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        let mut bmp_file = fs::File::create(path)?;
+        self.to_writer(&mut bmp_file)
+    }
+
+    /// Writes the `Image` instance to the writer referenced by `destination`.
+    pub fn to_writer<W: Write>(&self, destination: &mut W) -> io::Result<()> {
         let bmp_data = encoder::encode_image(self)?;
-        let mut bmp_file = fs::File::create(name)?;
-        bmp_file.write(&bmp_data)?;
+        destination.write(&bmp_data)?;
         Ok(())
     }
 }
@@ -378,6 +384,8 @@ impl Iterator for ImageIndex {
     }
 }
 
+/// Utility function to load an `Image` from the file specified by `path`.
+/// It uses the `from_reader` function internally to decode the `Image`.
 /// Returns a `BmpResult`, either containing an `Image` or a `BmpError`.
 ///
 /// # Example
@@ -387,12 +395,18 @@ impl Iterator for ImageIndex {
 ///    panic!("Failed to open: {}", e);
 /// });
 /// ```
-pub fn open(name: &str) -> BmpResult<Image> {
-    let mut bytes = Vec::new();
-    let mut f = fs::File::open(name)?;
-    f.read_to_end(&mut bytes)?;
-    let mut bmp_data = Cursor::new(bytes);
+pub fn open<P: AsRef<Path>>(path: P) -> BmpResult<Image> {
+    let mut f = fs::File::open(path)?;
+    from_reader(&mut f)
+}
 
+/// Attempts to construct a new `Image` from the given reader.
+/// Returns a `BmpResult`, either containing an `Image` or a `BmpError`.
+pub fn from_reader<R: Read>(source: &mut R) -> BmpResult<Image> {
+    let mut bytes = Vec::new();
+    source.read_to_end(&mut bytes)?;
+
+    let mut bmp_data = Cursor::new(bytes);
     decoder::decode_image(&mut bmp_data)
 }
 
@@ -435,8 +449,17 @@ mod tests {
     }
 
     #[test]
-    fn can_read_bmp_image() {
+    fn can_read_bmp_image_from_file_specified_by_path() {
         let bmp_img = open("test/rgbw.bmp").unwrap();
+        verify_test_bmp_image(bmp_img);
+    }
+
+    #[test]
+    fn can_read_bmp_image_from_reader() {
+        let mut f = fs::File::open("test/rgbw.bmp").unwrap();
+
+        let bmp_img = from_reader(&mut f).unwrap();
+
         verify_test_bmp_image(bmp_img);
     }
 
