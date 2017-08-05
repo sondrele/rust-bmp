@@ -476,44 +476,42 @@ mod tests {
 
     #[test]
     fn read_write_4pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/4bb-1x1.bmp");
-        let img = open("test/4bb-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/4bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
     }
 
     #[test]
     fn read_write_8pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/8bb-1x1.bmp");
-        let img = open("test/8bb-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/8bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
     }
 
     #[test]
-    fn read_bmp_v4_image() {
+    fn read_write_bmp_v3_image() {
+        let bmp_img = open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp").unwrap();
+        bmp_img.save("test/24bpp-320x240.bmp").unwrap();
+    }
+
+    #[test]
+    fn read_write_bmp_v4_image() {
         let bmp_img = open("test/bmpsuite-2.5/g/pal8v4.bmp").unwrap();
         bmp_img.save("test/pal8v4-test.bmp").unwrap();
     }
 
     #[test]
-    fn read_bmp_v5_image() {
+    fn read_write_bmp_v5_image() {
         let bmp_img = open("test/bmpsuite-2.5/g/pal8v5.bmp").unwrap();
         bmp_img.save("test/pal8v5-test.bmp").unwrap();
     }
