@@ -67,7 +67,7 @@ pub enum BmpErrorKind {
     UnsupportedBitsPerPixel,
     UnsupportedCompressionType,
     UnsupportedBmpVersion,
-    Other,
+    UnsupportedHeader,
     BmpIoError(io::Error),
 }
 
@@ -160,13 +160,18 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
         Some(BmpVersion::Three) | Some(BmpVersion::Four) | Some(BmpVersion::Five) => (),
         // Otherwise, report the errors
         Some(other) => return Err(BmpError::new(UnsupportedBmpVersion, other)),
-        None => return Err(BmpError::new(BmpErrorKind::Other, format!("Invalid dib header: {:?}", dib_header))),
+        None => return Err(BmpError::new   (
+            UnsupportedHeader,
+            format!("Only simple BMP images of version 3, 4, and 5 are currently supported. \
+                Connot decode the image for the following header: {:?}", dib_header))),
     }
 
     match dib_header.bits_per_pixel {
         // Currently supported
         1 | 4 | 8 | 24 => (),
-        other => return Err(BmpError::new(UnsupportedBitsPerPixel, format!("{}", other)))
+        other => return Err(BmpError::new(
+            UnsupportedBitsPerPixel,
+            format!("Only 1, 4, 8, and 24 bits per pixel are currently supported, was: {}", other)))
     }
 
     match CompressionType::from_u32(dib_header.compress_type) {
