@@ -2,7 +2,7 @@ rust-bmp
 ========
 [![Build Status](https://travis-ci.org/sondrele/rust-bmp.svg?branch=master)](https://travis-ci.org/sondrele/rust-bmp)
 
-[Full documentation](http://sondrele.github.io/rust-bmp/bmp/index.html)
+[Full documentation](https://docs.rs/bmp/)
 
 Small module for reading and writing bitmap images.
 See the documentation for the current status of BMP encoding and decoding support.
@@ -30,7 +30,7 @@ Save an image with the `save` function, by specifying the `path`. The function r
 an `IoResult` which indicates whether the save was successful or not.
 ```rust
 let pixel = img.get_pixel(0, 0);
-img.set_pixel(50, 50, Pixel { r: 255, g: 255, b: 255 });
+img.set_pixel(50, 50, Pixel::new(255, 255, 255));
 let _ = img.save("path/to/img.bmp");
 ```
 ### Opening
