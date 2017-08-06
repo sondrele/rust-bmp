@@ -31,9 +31,9 @@ fn write_header(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
     bmp_data.write_u32::<LittleEndian>(dib_header.header_size)?;
     bmp_data.write_i32::<LittleEndian>(dib_header.width)?;
     bmp_data.write_i32::<LittleEndian>(dib_header.height)?;
-    bmp_data.write_u16::<LittleEndian>(1)?;  // num_planes
+    bmp_data.write_u16::<LittleEndian>(1)?; // num_planes
     bmp_data.write_u16::<LittleEndian>(24)?; // bits_per_pixel
-    bmp_data.write_u32::<LittleEndian>(0)?;  // compress_type
+    bmp_data.write_u32::<LittleEndian>(0)?; // compress_type
     bmp_data.write_u32::<LittleEndian>(data_size)?;
     bmp_data.write_i32::<LittleEndian>(dib_header.hres)?;
     bmp_data.write_i32::<LittleEndian>(dib_header.vres)?;
@@ -43,9 +43,9 @@ fn write_header(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
 }
 
 fn write_data(bmp_data: &mut Vec<u8>, img: &Image) -> io::Result<()> {
-    let padding = &[0; 4][0 .. img.padding as usize];
-    for y in 0 .. img.height {
-        for x in 0 .. img.width {
+    let padding = &[0; 4][0..img.padding as usize];
+    for y in 0..img.height {
+        for x in 0..img.width {
             let index = (y * img.width + x) as usize;
             let px = &img.data[index];
             Write::write(bmp_data, &[px.b, px.g, px.r])?;

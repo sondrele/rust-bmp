@@ -83,24 +83,36 @@ impl Pixel {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
-    One,
     Two,
     Three,
     ThreeNT,
     Four,
+    Five,
+}
+
+impl BmpVersion {
+    fn from_dib_header(dib_header: &BmpDibHeader) -> Option<BmpVersion> {
+        match dib_header.header_size {
+            12 => Some(BmpVersion::Two),
+            40 if dib_header.compress_type == 3 => Some(BmpVersion::ThreeNT),
+            40 => Some(BmpVersion::Three),
+            108 => Some(BmpVersion::Four),
+            124 => Some(BmpVersion::Five),
+            _ => None,
+        }
+    }
 }
 
 impl AsRef<str> for BmpVersion {
     fn as_ref(&self) -> &str {
         match *self {
-            BmpVersion::One => "BMP Version 1",
             BmpVersion::Two => "BMP Version 2",
             BmpVersion::Three => "BMP Version 3",
             BmpVersion::ThreeNT => "BMP Version 3 NT",
             BmpVersion::Four => "BMP Version 4",
+            BmpVersion::Five => "BMP Version 5",
         }
     }
 }
@@ -128,10 +140,10 @@ impl CompressionType {
 impl AsRef<str> for CompressionType {
     fn as_ref(&self) -> &str {
         match *self {
-            CompressionType::Rle8bit           => "RLE 8-bit",
-            CompressionType::Rle4bit           => "RLE 4-bit",
+            CompressionType::Rle8bit => "RLE 8-bit",
+            CompressionType::Rle4bit => "RLE 4-bit",
             CompressionType::BitfieldsEncoding => "Bitfields Encoding",
-            CompressionType::Uncompressed      => "Uncompressed",
+            CompressionType::Uncompressed => "Uncompressed",
         }
     }
 }
@@ -148,8 +160,8 @@ impl BmpHeader {
     fn new(header_size: u32, data_size: u32) -> BmpHeader {
         BmpHeader {
             file_size: header_size + data_size,
-            creator1: 0 /* Unused */,
-            creator2: 0 /* Unused */,
+            creator1: 0, /* Unused */
+            creator2: 0, /* Unused */
             pixel_offset: header_size,
         }
     }
@@ -184,7 +196,7 @@ impl BmpDibHeader {
             hres: 1000,
             vres: 1000,
             num_colors: 0,
-            num_imp_colors: 0
+            num_imp_colors: 0,
         }
     }
 }
@@ -216,13 +228,11 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
-    ///
     /// let mut img = bmp::Image::new(100, 80);
     /// ```
     pub fn new(width: u32, height: u32) -> Image {
         let mut data = Vec::with_capacity((width * height) as usize);
-        for _ in 0 .. width * height {
+        for _ in 0..width * height {
             data.push(px!(0, 0, 0));
         }
 
@@ -234,7 +244,7 @@ impl Image {
             width: width,
             height: height,
             padding: width % 4,
-            data: data
+            data: data,
         }
     }
 
@@ -255,8 +265,6 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
-    ///
     /// let mut img = bmp::Image::new(100, 80);
     /// img.set_pixel(10, 10, bmp::consts::RED);
     /// ```
@@ -270,8 +278,6 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
-    ///
     /// let img = bmp::Image::new(100, 80);
     /// assert_eq!(bmp::consts::BLACK, img.get_pixel(10, 10));
     /// ```
@@ -285,8 +291,6 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
-    ///
     /// let mut img = bmp::Image::new(100, 100);
     /// for (x, y) in img.coordinates() {
     ///     img.set_pixel(x, y, bmp::consts::BLUE);
@@ -305,15 +309,14 @@ impl Image {
     /// # Example
     ///
     /// ```
-    /// extern crate bmp;
+    /// use bmp::Image;
     ///
-    /// let mut img = bmp::Image::new(100, 100);
+    /// let mut img = Image::new(100, 100);
     /// let _ = img.save("black.bmp").unwrap_or_else(|e| {
     ///     panic!("Failed to save: {}", e)
     /// });
     /// ```
     pub fn save(&self, name: &str) -> io::Result<()> {
-        // only 24 bpp encoding supported
         let bmp_data = encoder::encode_image(self)?;
         let mut bmp_file = fs::File::create(name)?;
         bmp_file.write(&bmp_data)?;
@@ -343,16 +346,16 @@ pub struct ImageIndex {
     width: u32,
     height: u32,
     x: u32,
-    y: u32
+    y: u32,
 }
 
 impl ImageIndex {
     fn new(width: u32, height: u32) -> ImageIndex {
         ImageIndex {
-            width: width,
-            height: height,
+            width,
+            height,
             x: 0,
-            y: 0
+            y: 0,
         }
     }
 }
@@ -380,8 +383,6 @@ impl Iterator for ImageIndex {
 /// # Example
 ///
 /// ```
-/// extern crate bmp;
-///
 /// let img = bmp::open("test/rgbw.bmp").unwrap_or_else(|e| {
 ///    panic!("Failed to open: {}", e);
 /// });
@@ -410,34 +411,25 @@ mod tests {
         assert_eq!(40, bmp_bip_header_size);
     }
 
-    // #[test]
-    // fn size_of_4pixel_bmp_image_is_70_bytes() {
-    //     let path_wd = path::Path::new("test/rgbw.bmp");
-    //     match path_wd.metadata() {
-    //         Ok(stat) => assert_eq!(70, stat.len() as i32),
-    //         Err(_) => (/* Ignore IoError for now */)
-    //     }
-    // }
-
     fn verify_test_bmp_image(img: Image) {
         let header = img.header;
         assert_eq!(70, header.file_size);
-        assert_eq!(0,  header.creator1);
-        assert_eq!(0,  header.creator2);
+        assert_eq!(0, header.creator1);
+        assert_eq!(0, header.creator2);
 
         let dib_header = img.dib_header;
-        assert_eq!(54,   header.pixel_offset);
-        assert_eq!(40,   dib_header.header_size);
-        assert_eq!(2,    dib_header.width);
-        assert_eq!(2,    dib_header.height);
-        assert_eq!(1,    dib_header.num_planes);
-        assert_eq!(24,   dib_header.bits_per_pixel);
-        assert_eq!(0,    dib_header.compress_type);
-        assert_eq!(16,   dib_header.data_size);
+        assert_eq!(54, header.pixel_offset);
+        assert_eq!(40, dib_header.header_size);
+        assert_eq!(2, dib_header.width);
+        assert_eq!(2, dib_header.height);
+        assert_eq!(1, dib_header.num_planes);
+        assert_eq!(24, dib_header.bits_per_pixel);
+        assert_eq!(0, dib_header.compress_type);
+        assert_eq!(16, dib_header.data_size);
         assert_eq!(1000, dib_header.hres);
         assert_eq!(1000, dib_header.vres);
-        assert_eq!(0,    dib_header.num_colors);
-        assert_eq!(0,    dib_header.num_imp_colors);
+        assert_eq!(0, dib_header.num_colors);
+        assert_eq!(0, dib_header.num_imp_colors);
 
         assert_eq!(2, img.padding);
     }
@@ -456,7 +448,14 @@ mod tests {
         let mut px = [0; 3];
         f.read(&mut px).unwrap();
 
-        assert_eq!(Pixel {r: px[2], g: px[1], b: px[0] }, consts::BLUE);
+        assert_eq!(
+            Pixel {
+                r: px[2],
+                g: px[1],
+                b: px[0],
+            },
+            consts::BLUE
+        );
     }
 
     #[test]
@@ -484,42 +483,52 @@ mod tests {
 
     #[test]
     fn read_write_4pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/bmptestsuite-0.9/valid/4bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/4bb-1x1.bmp");
-        let img = open("test/4bb-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/4bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
     }
 
     #[test]
     fn read_write_8pbb_bmp_image() {
-        let img = open("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/bmptestsuite-0.9/valid/8bpp-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
 
         let _ = img.save("test/8bb-1x1.bmp");
-        let img = open("test/8bb-1x1.bmp").unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let img = open("test/8bb-1x1.bmp").unwrap();
         assert_eq!(img.data.len(), 1);
         assert_eq!(img.get_pixel(0, 0), consts::BLUE);
+    }
+
+    #[test]
+    fn read_write_bmp_v3_image() {
+        let bmp_img = open("test/bmptestsuite-0.9/valid/24bpp-320x240.bmp").unwrap();
+        bmp_img.save("test/24bpp-320x240.bmp").unwrap();
+    }
+
+    #[test]
+    fn read_write_bmp_v4_image() {
+        let bmp_img = open("test/bmpsuite-2.5/g/pal8v4.bmp").unwrap();
+        bmp_img.save("test/pal8v4-test.bmp").unwrap();
+    }
+
+    #[test]
+    fn read_write_bmp_v5_image() {
+        let bmp_img = open("test/bmpsuite-2.5/g/pal8v5.bmp").unwrap();
+        bmp_img.save("test/pal8v5-test.bmp").unwrap();
     }
 
     #[test]
     fn error_when_opening_unexisting_image() {
         let result = open("test/no_img.bmp");
         match result {
-            Err(BmpError{ kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
-            _ => panic!("Ghost image!?")
+            Err(BmpError { kind: BmpErrorKind::BmpIoError(_), .. }) => (/* Expected */),
+            _ => panic!("No image expected..."),
         }
     }
 
@@ -528,7 +537,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/valid/32bpp-1x1.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::UnsupportedBitsPerPixel, .. }) => (/* Expected */),
-            _ => panic!("32bpp should not be supported")
+            _ => panic!("32bpp are not yet supported"),
         }
     }
 
@@ -537,7 +546,7 @@ mod tests {
         let result = open("test/bmptestsuite-0.9/corrupt/magicnumber-bad.bmp");
         match result {
             Err(BmpError { kind: BmpErrorKind::WrongMagicNumbers, .. }) => (/* Expected */),
-            _ => panic!("Wrong magic numbers should not be supported")
+            _ => panic!("Wrong magic numbers are not supported"),
         }
     }
 

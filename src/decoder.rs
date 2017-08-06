@@ -7,6 +7,9 @@ use std::error::Error;
 use std::fmt;
 use std::io::{self, Cursor, Read, SeekFrom, Seek};
 
+// The BmpHeader always has a size of 14 bytes
+const BMP_HEADER_SIZE: u64 = 14;
+
 // Import structs/functions defined in lib.rs
 use super::*;
 use self::BmpErrorKind::*;
@@ -52,7 +55,7 @@ impl Error for BmpError {
     fn description(&self) -> &str {
         match self.kind {
             BmpIoError(ref e) => e.description(),
-            _ => &self.details
+            _ => &self.details,
         }
     }
 }
@@ -64,7 +67,7 @@ pub enum BmpErrorKind {
     UnsupportedBitsPerPixel,
     UnsupportedCompressionType,
     UnsupportedBmpVersion,
-    Other,
+    UnsupportedHeader,
     BmpIoError(io::Error),
 }
 
@@ -92,20 +95,27 @@ pub fn decode_image(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<Image> {
     let padding = width % 4;
 
     let data = match color_palette {
-        Some(ref palette) =>
-            read_indexes(bmp_data.get_mut(), &palette, width as usize, height as usize,
-                         dib_header.bits_per_pixel, header.pixel_offset as usize)?,
-        None => read_pixels(bmp_data, width, height, header.pixel_offset, padding as i64)?
+        Some(ref palette) => {
+            read_indexes(
+                bmp_data.get_mut(),
+                &palette,
+                width as usize,
+                height as usize,
+                dib_header.bits_per_pixel,
+                header.pixel_offset as usize,
+            )?
+        }
+        None => read_pixels(bmp_data, width, height, header.pixel_offset, padding as i64)?,
     };
 
     let image = Image {
-        header: header,
-        dib_header: dib_header,
-        color_palette: color_palette,
-        width: width,
-        height: height,
-        padding: padding,
-        data: data
+        header,
+        dib_header: BmpDibHeader::new(width as i32, height as i32),
+        color_palette,
+        width,
+        height,
+        padding,
+        data,
     };
 
     Ok(image)
@@ -118,16 +128,18 @@ fn read_bmp_id(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<()> {
     if bm == b"BM"[..] {
         Ok(())
     } else {
-        Err(BmpError::new(WrongMagicNumbers,
-            format!("Expected [66, 77], but was {:?}", bm)))
+        Err(BmpError::new(
+            WrongMagicNumbers,
+            format!("Expected [66, 77], but was {:?}", bm),
+        ))
     }
 }
 
 fn read_bmp_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpHeader> {
     let header = BmpHeader {
-        file_size:    bmp_data.read_u32::<LittleEndian>()?,
-        creator1:     bmp_data.read_u16::<LittleEndian>()?,
-        creator2:     bmp_data.read_u16::<LittleEndian>()?,
+        file_size: bmp_data.read_u32::<LittleEndian>()?,
+        creator1: bmp_data.read_u16::<LittleEndian>()?,
+        creator2: bmp_data.read_u16::<LittleEndian>()?,
         pixel_offset: bmp_data.read_u32::<LittleEndian>()?,
     };
 
@@ -136,35 +148,53 @@ fn read_bmp_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpHeader> {
 
 fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader> {
     let dib_header = BmpDibHeader {
-        header_size:    bmp_data.read_u32::<LittleEndian>()?,
-        width:          bmp_data.read_i32::<LittleEndian>()?,
-        height:         bmp_data.read_i32::<LittleEndian>()?,
-        num_planes:     bmp_data.read_u16::<LittleEndian>()?,
+        header_size: bmp_data.read_u32::<LittleEndian>()?,
+        width: bmp_data.read_i32::<LittleEndian>()?,
+        height: bmp_data.read_i32::<LittleEndian>()?,
+        num_planes: bmp_data.read_u16::<LittleEndian>()?,
         bits_per_pixel: bmp_data.read_u16::<LittleEndian>()?,
-        compress_type:  bmp_data.read_u32::<LittleEndian>()?,
-        data_size:      bmp_data.read_u32::<LittleEndian>()?,
-        hres:           bmp_data.read_i32::<LittleEndian>()?,
-        vres:           bmp_data.read_i32::<LittleEndian>()?,
-        num_colors:     bmp_data.read_u32::<LittleEndian>()?,
+        compress_type: bmp_data.read_u32::<LittleEndian>()?,
+        data_size: bmp_data.read_u32::<LittleEndian>()?,
+        hres: bmp_data.read_i32::<LittleEndian>()?,
+        vres: bmp_data.read_i32::<LittleEndian>()?,
+        num_colors: bmp_data.read_u32::<LittleEndian>()?,
         num_imp_colors: bmp_data.read_u32::<LittleEndian>()?,
     };
 
-    match dib_header.header_size {
-        // BMPv2 has a header size of 12 bytes
-        12 => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two)),
-        // BMPv3 has a header size of 40 bytes, it is NT if the compression type is 3
-        40 if dib_header.compress_type == 3 =>
-            return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::ThreeNT)),
-        // BMPv4 has more data in its header, it is currently ignored but we still try to parse it
-        108 | _ => ()
+    match BmpVersion::from_dib_header(&dib_header) {
+        // V3 is the only version that is "fully" supported (decompressed images are the exception)
+        // We will also attempt to decode v4 and v5, but we ignore all the additional data in the header.
+        // This should not impose a big problem because neither decompression, nor 16 and 32-bit images are supported,
+        // so the decoding will likely fail due to these constraints either way.
+        Some(BmpVersion::Three) |
+        Some(BmpVersion::Four) |
+        Some(BmpVersion::Five) => (),
+        // Otherwise, report the errors
+        Some(other) => return Err(BmpError::new(UnsupportedBmpVersion, other)),
+        None => {
+            return Err(BmpError::new(
+                UnsupportedHeader,
+                format!(
+                    "Only simple BMP images of version 3, 4, and 5 are currently supported. \
+                Connot decode the image for the following header: {:?}",
+                    dib_header
+                ),
+            ))
+        }
     }
 
     match dib_header.bits_per_pixel {
         // Currently supported
         1 | 4 | 8 | 24 => (),
-        other => return Err(
-            BmpError::new(UnsupportedBitsPerPixel, format!("{}", other))
-        )
+        other => {
+            return Err(BmpError::new(
+                UnsupportedBitsPerPixel,
+                format!(
+                    "Only 1, 4, 8, and 24 bits per pixel are currently supported, was: {}",
+                    other
+                ),
+            ))
+        }
     }
 
     match CompressionType::from_u32(dib_header.compress_type) {
@@ -175,26 +205,32 @@ fn read_bmp_dib_header(bmp_data: &mut Cursor<Vec<u8>>) -> BmpResult<BmpDibHeader
     Ok(dib_header)
 }
 
-fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
-                      BmpResult<Option<Vec<Pixel>>> {
+fn read_color_palette(
+    bmp_data: &mut Cursor<Vec<u8>>,
+    dh: &BmpDibHeader,
+) -> BmpResult<Option<Vec<Pixel>>> {
     let num_entries = match dh.bits_per_pixel {
-        // We have a color_palette if there if num_colors in the dib header is not zero
+        // We have a color_palette if the num_colors in the dib header is not zero
         _ if dh.num_colors != 0 => dh.num_colors as usize,
         // Or if there are 8 or less bits per pixel
         bpp @ 1 | bpp @ 4 | bpp @ 8 => 1 << bpp,
-        _ => return Ok(None)
+        _ => return Ok(None),
     };
 
-    let num_bytes = match dh.header_size {
-        // Each entry in the color_palette is four bytes for Version 3 or 4
-        40 | 108 => 4,
-        // Three bytes for Version two. Though, this is currently not supported
-        _ => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two))
+    let num_bytes = match BmpVersion::from_dib_header(&dh) {
+        // Three bytes for v2. Though, this is currently not supported
+        Some(BmpVersion::Two) => return Err(BmpError::new(UnsupportedBmpVersion, BmpVersion::Two)),
+        // Each entry in the color_palette is four bytes for v3, v4, and v5
+        _ => 4,
     };
 
-    let mut px = &mut [0; 4][0 .. num_bytes as usize];
+    bmp_data.seek(SeekFrom::Start(
+        BMP_HEADER_SIZE + dh.header_size as u64,
+    ))?;
+
+    let mut px = &mut [0; 4][0..num_bytes as usize];
     let mut color_palette = Vec::with_capacity(num_entries);
-    for _ in 0 .. num_entries {
+    for _ in 0..num_entries {
         bmp_data.read(&mut px)?;
         color_palette.push(px!(px[2], px[1], px[0]));
     }
@@ -202,18 +238,24 @@ fn read_color_palette(bmp_data: &mut Cursor<Vec<u8>>, dh: &BmpDibHeader) ->
     Ok(Some(color_palette))
 }
 
-fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
-                width: usize, height: usize, bpp: u16, offset: usize) -> BmpResult<Vec<Pixel>> {
+fn read_indexes(
+    bmp_data: &mut Vec<u8>,
+    palette: &Vec<Pixel>,
+    width: usize,
+    height: usize,
+    bpp: u16,
+    offset: usize,
+) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity(height * width);
     // Number of bytes to read from each row, varies based on bits_per_pixel
     let bytes_per_row = (width as f64 / (8.0 / bpp as f64)).ceil() as usize;
-    for y in 0 .. height {
+    for y in 0..height {
         let padding = match bytes_per_row % 4 {
             0 => 0,
-            other => 4 - other
+            other => 4 - other,
         };
         let start = offset + (bytes_per_row + padding) * y;
-        let bytes = &bmp_data[start .. start + bytes_per_row];
+        let bytes = &bmp_data[start..start + bytes_per_row];
 
         for i in bit_index(&bytes, bpp as usize, width as usize) {
             data.push(palette[i]);
@@ -222,15 +264,20 @@ fn read_indexes(bmp_data: &mut Vec<u8>, palette: &Vec<Pixel>,
     Ok(data)
 }
 
-fn read_pixels(bmp_data: &mut Cursor<Vec<u8>>, width: u32, height: u32,
-               offset: u32, padding: i64) -> BmpResult<Vec<Pixel>> {
+fn read_pixels(
+    bmp_data: &mut Cursor<Vec<u8>>,
+    width: u32,
+    height: u32,
+    offset: u32,
+    padding: i64,
+) -> BmpResult<Vec<Pixel>> {
     let mut data = Vec::with_capacity((height * width) as usize);
     // seek until data
     bmp_data.seek(SeekFrom::Start(offset as u64))?;
     // read pixels until padding
     let mut px = [0; 3];
-    for _ in 0 .. height {
-        for _ in 0 .. width {
+    for _ in 0..height {
+        for _ in 0..width {
             bmp_data.read(&mut px)?;
             data.push(px!(px[2], px[1], px[0]));
         }
@@ -255,11 +302,11 @@ struct BitIndex<'a> {
 fn bit_index<'a>(bytes: &'a [u8], nbits: usize, size: usize) -> BitIndex {
     let bits_left = BITS - nbits;
     BitIndex {
-        size: size,
-        nbits: nbits,
-        bits_left: bits_left,
+        size,
+        nbits,
+        bits_left,
         mask: (!0 as u8 >> bits_left),
-        bytes: bytes,
+        bytes,
         index: 0,
     }
 }
@@ -277,9 +324,9 @@ impl<'a> Iterator for BitIndex<'a> {
             None
         } else {
             self.size -= 1;
-            self.bytes.get(n).map(|&block|
+            self.bytes.get(n).map(|&block| {
                 ((block & self.mask << offset) >> offset) as usize
-            )
+            })
         }
     }
 }
