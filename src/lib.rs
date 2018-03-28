@@ -84,6 +84,27 @@ impl Pixel {
     }
 }
 
+/// Displays the rgb values as an rgb color triple
+impl fmt::Display for Pixel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "rgb({}, {}, {})", self.r, self.g, self.b)
+    }
+}
+
+/// Displays the rgb values as an upper-case 24-bit hexadecimal number
+impl fmt::UpperHex for Pixel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:02X}{:02X}{:02X}", self.r, self.g, self.b)
+    }
+}
+
+/// Displays the rgb values as a lower-case 24-bit hexadecimal number
+impl fmt::LowerHex for Pixel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BmpVersion {
     Two,
