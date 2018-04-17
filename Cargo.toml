@@ -1,11 +1,11 @@
 [package]
 
 name = "bmp"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Sondre Lefsaker"]
 
 description = "Small library for reading and writing BMP images in Rust."
-documentation = "http://sondrele.github.io/rust-bmp/bmp/index.html"
+documentation = "https://docs.rs/bmp"
 repository = "https://github.com/sondrele/rust-bmp.git"
 homepage = "https://github.com/sondrele/rust-bmp"
 
