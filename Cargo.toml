@@ -14,7 +14,7 @@ readme = "README.md"
 
 keywords = ["bmp", "image"]
 
-exclude = ["test"]
+exclude = ["test/*"]
 
 [dependencies]
 byteorder = "^1.0.0"
