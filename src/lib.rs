@@ -353,14 +353,14 @@ impl Image {
 
 impl fmt::Debug for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "Image {}\n", '{')?;
-        write!(f, "\theader: {:?},\n", self.header)?;
-        write!(f, "\tdib_header: {:?},\n", self.dib_header)?;
-        write!(f, "\tcolor_palette: {:?},\n", self.color_palette)?;
-        write!(f, "\twidth: {:?},\n", self.width)?;
-        write!(f, "\theight: {:?},\n", self.height)?;
-        write!(f, "\tpadding: {:?},\n", self.padding)?;
-        write!(f, "{}", '}')
+        f.debug_struct("Image")
+            .field("header", &self.header)
+            .field("dib_header", &self.dib_header)
+            .field("color_palette", &self.color_palette)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("padding", &self.padding)
+            .finish()
     }
 }
 
